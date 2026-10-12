@@ -96,6 +96,7 @@ Page {
         if (expandT <= 0) return;
         histFlick.followNewest = true;
         histFlick.contentX = Math.max(0, histFlick.contentWidth - histFlick.width);
+        histFlick.savedX = histFlick.contentX;
     }
     // Set by a press inside the expanded table: release collapses it unless the press
     // moved past the tap slop or the history flickable was moving (drag/flick scrolls).
@@ -1295,12 +1296,24 @@ Page {
                 // Auto-follow the newest column only if the table was already there (or within half a
                 // column of it). Otherwise the same columns stay in view when solves are added or
                 // changed. Collapsing and re-expanding resets to the newest column.
+                // followNewest / savedX change ONLY from user scrolling (movement end). Programmatic
+                // changes (Repeater rebuild after a solve, bounds clamping) must not flip them, or a
+                // table scrolled to older solves would jump to the newest (or vice versa).
                 property bool followNewest: true
-                onContentXChanged: followNewest = contentX >= Math.max(0, contentWidth - width) - page.histColW / 2
-                onContentWidthChanged: if (followNewest) page.scrollHistToNewest()
-                onWidthChanged: if (followNewest) page.scrollHistToNewest()
+                property real savedX: 0
+                function settle() {
+                    if (followNewest) page.scrollHistToNewest();
+                    else contentX = Math.min(savedX, Math.max(0, contentWidth - width));
+                }
+                onContentWidthChanged: settleTimer.restart()
+                onWidthChanged: settleTimer.restart()
+                Timer { id: settleTimer; interval: 0; onTriggered: histFlick.settle() }
                 onMovementStarted: flick.interactive = false
-                onMovementEnded: flick.interactive = true
+                onMovementEnded: {
+                    flick.interactive = true;
+                    followNewest = contentX >= Math.max(0, contentWidth - width) - page.histColW / 2;
+                    savedX = contentX;
+                }
 
                 Row {
                     id: histRow
