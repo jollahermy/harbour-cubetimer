@@ -11,4 +11,17 @@ ApplicationWindow {
     initialPage: Component {
         TimerPage { }
     }
+
+    // Home/switcher cover: the app icon, centred, no actions or text.
+    cover: CoverBackground {
+        Image {
+            anchors.centerIn: parent
+            width: parent.width * 0.55
+            height: width
+            sourceSize.width: width
+            sourceSize.height: height
+            fillMode: Image.PreserveAspectFit
+            source: Qt.resolvedUrl('../../icons/hicolor/256x256/apps/cube-timer-v3.png')
+        }
+    }
 }
