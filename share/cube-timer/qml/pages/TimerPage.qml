@@ -924,28 +924,28 @@ Page {
             visible: page.hasSolves
             MenuItem {
 
-                font.family: page.appFont; font.letterSpacing: font.pixelSize * page.trackK
+                font.family: page.appFont; font.letterSpacing: Theme.fontSizeMedium * page.trackK
                 text: "Delete"
                 enabled: page.canEditLast
                 onClicked: page.deleteSolve()
             }
             MenuItem {
 
-                font.family: page.appFont; font.letterSpacing: font.pixelSize * page.trackK
+                font.family: page.appFont; font.letterSpacing: Theme.fontSizeMedium * page.trackK
                 text: "OK"
                 enabled: page.canEditLast
                 onClicked: page.clearPenalty()
             }
             MenuItem {
 
-                font.family: page.appFont; font.letterSpacing: font.pixelSize * page.trackK
+                font.family: page.appFont; font.letterSpacing: Theme.fontSizeMedium * page.trackK
                 text: "DNF"
                 enabled: page.canEditLast
                 onClicked: page.setDnf()
             }
             MenuItem {
 
-                font.family: page.appFont; font.letterSpacing: font.pixelSize * page.trackK
+                font.family: page.appFont; font.letterSpacing: Theme.fontSizeMedium * page.trackK
                 text: "+2"
                 enabled: page.canEditLast
                 onClicked: page.addPlus2()
