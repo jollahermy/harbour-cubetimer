@@ -1766,6 +1766,20 @@ Page {
         }
     }
 
+    // ---- full-page stop layer (only while running) -----------------------
+    // Above everything except the popup: while a solve runs, a press ANYWHERE (incl. the
+    // hidden scramble area and the stats/history table) stops it at once. The table and other
+    // controls underneath never see the touch. The same touch's release stays with this area,
+    // so it cannot arm a new hold.
+    MouseArea {
+        id: runStopLayer
+        anchors.fill: parent
+        z: 15
+        enabled: page.phase === "running"
+        visible: enabled
+        onPressed: page.stopSolve(Date.now())
+    }
+
     // ---- solve detail popup overlay -----------------------------------
     // Full-page layer above everything: dims the page and eats every touch while shown,
     // so nothing underneath (solve start, pull-down, table) sees it. Tap the dim area to close (taps on the card do nothing).
