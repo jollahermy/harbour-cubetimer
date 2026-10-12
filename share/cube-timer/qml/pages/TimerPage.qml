@@ -1548,6 +1548,9 @@ Page {
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
                             width: menuRow.actionW
+                            // Only drawn while the row is slid left, so at rest nothing sits under the
+                            // (transparent) row and the list's rounded corners stay clean.
+                            visible: rowContent.x < -0.5
 
                             // Rounded pill inset inside the row, so its corners never poke out of the
                             // drop-down's rounded corners (clip only clips the bounding box).
@@ -1577,9 +1580,13 @@ Page {
                                 NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
                             }
 
+                            // Opaque backing only while slid (covers the Delete pill). At rest the row is
+                            // transparent, so square row corners never cut into the list's rounded corners.
                             Rectangle {
                                 anchors.fill: parent
+                                radius: page.cornerRadius
                                 color: page.panelColor
+                                visible: rowContent.x < -0.5
                             }
                             // Press feedback: accent tint while the finger is down and the press has
                             // not turned into a swipe, a vertical scroll or a long press (rename).
