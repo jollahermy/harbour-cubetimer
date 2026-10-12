@@ -26,12 +26,18 @@ MouseArea {
     // and no swipe was recognised. 0 disables it. Cancelled by any larger move, release or cancel.
     property int holdMs: 0
     signal longPress()
+    property bool longFired: false         // this press became a long press (owner: no tap)
 
     Timer {
         id: holdPressTimer
         interval: area.holdMs
         repeat: false
-        onTriggered: if (area.mode === 0 && area.holdMs > 0) area.longPress()
+        onTriggered: {
+            if (area.mode === 0 && area.holdMs > 0) {
+                area.longFired = true;
+                area.longPress();
+            }
+        }
     }
 
     function lock() {
@@ -50,6 +56,7 @@ MouseArea {
         startY = mouse.y;
         mode = 0;
         swiped = false;
+        longFired = false;
         holdPressTimer.stop();
         if (area.holdMs > 0) holdPressTimer.restart();
     }

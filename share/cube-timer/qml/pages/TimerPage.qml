@@ -62,14 +62,14 @@ Page {
     readonly property real histColW: pHist.implicitWidth + Theme.paddingLarge
     // Shown instead of the history when the session has no solves (one '-' column, no popup).
     readonly property var emptyHist: [{ n: "-", time: "-", ao5: "-", ao12: "-", ao100: "-" }]
-    onExpandTChanged: scrollHistToNewest()
+    onExpandTChanged: if (statsExpanded) scrollHistToNewest();
     // Keep the history table on its newest column (right edge) while expanded.
+    // Only called on expand and when the table was already following the newest column.
     function scrollHistToNewest() {
         if (expandT <= 0) return;
+        histFlick.followNewest = true;
         histFlick.contentX = Math.max(0, histFlick.contentWidth - histFlick.width);
     }
-    // Set by a press that starts outside the table: a short tap (no hold) then collapses it.
-    property bool pendingCollapse: false
     // Set by a press inside the expanded table: release collapses it unless the press
     // moved past the tap slop or the history flickable was moving (drag/flick scrolls).
     property bool tableTapPending: false
@@ -93,9 +93,7 @@ Page {
     // Top controls (event row + session row): ONE state, set in one place.
     //   normal = 1 (idle, after stop/cancel) | dim = 0.3 (holding) | hidden = 0 (running)
     // Opacity only (no layout change). Clicks are already blocked by phase (MouseAreas/BackgroundItems).
-    property string topMode: "normal"
     function setTopMode(m) {
-        topMode = m;
         topRow.opacity = (m === "normal") ? 1 : (m === "dim" ? 0.3 : 0);
     }
     function setScrambleMode(m) {
@@ -140,7 +138,6 @@ Page {
     property string phase: "idle"                    // idle | holding | running
     property bool ready: false                       // hold >= readyDelayMs
     property bool pinching: false                    // two-finger gesture in progress
-    property bool runTapPending: false               // finger went down while running
     property real holdStart: 0
     property real startMs: 0
     property real lastStopMs: -100000
@@ -150,6 +147,10 @@ Page {
     readonly property color notReadyColor: "#ff4d4d"
     readonly property color readyColor: "#4dff88"
     readonly property color dimColor: "#9a9aa3"
+    // Fixed dark background (dark slate grey). Page, scramble veil and everything that must match use it.
+    readonly property color bgColor: "#23262c"
+    // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
+    readonly property color panelColor: "#2e323a"
 
     // ---- time font size -------------------------------------------------
     // Min: Theme.fontSizeExtraLarge. Default: 2.5 x Theme.fontSizeHuge.
@@ -222,12 +223,6 @@ Page {
     function rowChars(toks, maxLen) {
         return toks.length ? (toks.length - 1) * (maxLen + 1) + toks[toks.length - 1].length : 0;
     }
-    // Widest row (in characters) of a list of rows.
-    function widestChars(rows, maxLen) {
-        var w = 0;
-        for (var r = 0; r < rows.length; r++) w = Math.max(w, rowChars(rows[r], maxLen));
-        return w;
-    }
 
     // Generic fit: largest of [Large, Medium, Small, ExtraSmall] whose grid fits.
     // Megaminx: one WCA line per row, never wrapped inside a line.
@@ -289,15 +284,8 @@ Page {
     // Penalty line under the time: about 40% of the time size, at least fontSizeLarge.
     readonly property real penaltySize: Math.max(Theme.fontSizeLarge, timeSize * 0.4)
 
-    // Big scrambles (4x4+, megaminx) use a smaller font so they fit.
-    readonly property bool bigScramble: {
-        var id = currentEvent.id;
-        return id === "444" || id === "555" || id === "666" ||
-               id === "777" || id === "minx";
-    }
 
     // "12.34" below 60 s, "m:ss.cc" from 60 s on. Truncates to centiseconds (WCA style).
-    function pad2(n) { return n < 10 ? "0" + n : "" + n; }
     function fmt(ms) { return Stats.fmtMs(ms); }
 
     // ---- persistence (QtQuick.LocalStorage) -----------------------------
@@ -322,6 +310,40 @@ Page {
             tx.executeSql("INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)", [key, String(value)]);
         });
     }
+    // Several keys in ONE transaction (all written or none).
+    function setSettings(map) {
+        db.transaction(function (tx) {
+            for (var k in map)
+                tx.executeSql("INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)", [k, String(map[k])]);
+        });
+    }
+    // Stored sessions come from JSON. Drop malformed entries and fill in missing fields so the
+    // rest of the code can rely on id, name, solves (time_ms, penalty) being present.
+    // Dropped entries shift the stored currentSession index; it is only a fallback anyway.
+    function sanitizeSessions(list) {
+        var out = [];
+        var maxId = 0;
+        for (var i = 0; i < list.length; i++) {
+            var s = list[i];
+            if (!s || typeof s !== "object" || !Array.isArray(s.solves)) continue;
+            var ok = [];
+            for (var j = 0; j < s.solves.length; j++) {
+                var v = s.solves[j];
+                if (!v || typeof v.time_ms !== "number") continue;
+                var p = v.penalty || {};
+                v.penalty = { plus2Count: Math.max(0, parseInt(p.plus2Count, 10) || 0), dnf: !!p.dnf };
+                ok.push(v);
+            }
+            s.solves = ok;
+            if (typeof s.id === "number") maxId = Math.max(maxId, s.id);
+            out.push(s);
+        }
+        for (var k = 0; k < out.length; k++) {
+            if (typeof out[k].id !== "number") out[k].id = ++maxId;
+            if (typeof out[k].name !== "string") out[k].name = "Session";
+        }
+        return out;
+    }
     function loadSettings() {
         try {
             openDb();
@@ -335,6 +357,7 @@ Page {
             var list = [];
             try { list = JSON.parse(getSetting("sessions", "[]")); } catch (e) { list = []; }
             if (!Array.isArray(list)) list = [];
+            list = sanitizeSessions(list);
             sessions = list;
             // Backfill: solves saved before scrambles were stored get a random scramble of their
             // event, once. Written straight to the settings row (persist() needs the counters
@@ -387,13 +410,15 @@ Page {
             ensureSession();
         }
     }
+    // Everything that changes with a session/solve/event is written here in one transaction.
     function persist() {
+        lastSessionByEvent = lastSessionMap();
         try {
-            setSetting("event", currentEvent.id);
-            setSetting("sessions", JSON.stringify(sessions));
-            setSetting("currentSession", currentSession);
-            setSetting("sessionCounters", JSON.stringify(sessionCounters));
-            rememberSession();
+            setSettings({ event: currentEvent.id,
+                          sessions: JSON.stringify(sessions),
+                          currentSession: currentSession,
+                          sessionCounters: JSON.stringify(sessionCounters),
+                          lastSessionByEvent: JSON.stringify(lastSessionByEvent) });
         } catch (e) {
             console.log("cube-timer: settings not saved: " + e);
         }
@@ -404,15 +429,17 @@ Page {
     property var sessionCounters: ({})
     // Last-used session per event: lastSessionByEvent[eventId] = session id (stored in settings).
     property var lastSessionByEvent: ({})
-    function rememberSession() {
-        if (currentSession < 0 || currentSession >= sessions.length) return;
-        var sid = sessions[currentSession].id;
-        var ev = sessions[currentSession].event;
+    // lastSessionByEvent with the current session recorded (no write).
+    function lastSessionMap() {
         var m = {};
         for (var k in lastSessionByEvent) m[k] = lastSessionByEvent[k];
-        m[ev] = sid;
-        lastSessionByEvent = m;
-        try { setSetting("lastSessionByEvent", JSON.stringify(m)); } catch (e) { console.log("cube-timer: lastSession not saved: " + e); }
+        if (currentSession >= 0 && currentSession < sessions.length)
+            m[sessions[currentSession].event] = sessions[currentSession].id;
+        return m;
+    }
+    function rememberSession() {
+        lastSessionByEvent = lastSessionMap();
+        try { setSetting("lastSessionByEvent", JSON.stringify(lastSessionByEvent)); } catch (e) { console.log("cube-timer: lastSession not saved: " + e); }
     }
     function nextSessionNumber() {
         var ev = currentEvent.id;
@@ -425,11 +452,6 @@ Page {
         var m = 0;
         for (var k = 0; k < sessions.length; k++) m = Math.max(m, sessions[k].id);
         return m + 1;
-    }
-    function eventSessionCount() {
-        var c = 0;
-        for (var k = 0; k < sessions.length; k++) if (sessions[k].event === currentEvent.id) c++;
-        return c;
     }
     // Make the current session one that belongs to the current event
     // (the most recent one, or a new "Session 1" if the event has none yet).
@@ -553,6 +575,7 @@ Page {
         var idx = -1;
         for (var k = 0; k < sessions.length; k++) if (sessions[k].id === sid) idx = k;
         if (idx < 0) return;
+        if (renamingId === sid) renamingId = -1;
         var wasCurrent = (idx === currentSession);
         var all = sessions.slice();
         all.splice(idx, 1);
@@ -623,13 +646,14 @@ Page {
 
     // Show the last solve of the current session (or 0.00) in the display labels.
     function showSolve() {
+        closeSolvePopup();                            // the popup may show a solve that is gone now
         var s = lastSolve;
         if (!s) {
             timeText = "0.00";
             subText = "";
             return;
         }
-        var pen = s.penalty;
+        var pen = s.penalty || { plus2Count: 0, dnf: false };
         var added = 2000 * pen.plus2Count;
         if (pen.dnf) {                                // DNF overrides +2; raw time below
             timeText = "DNF";
@@ -651,8 +675,9 @@ Page {
         setTopMode("normal");
         phase = "idle";
         ready = false;
-        runTapPending = false;
-        setScrambleMode("normal");
+        setScrambleMode("normal");                   // before veilWipe.stop(): onStopped only acts in "sweep"
+        veilWipe.stop();
+        veilShift.y = 0;
         eventIndex = i;
         prevScramble = "";                            // history is per event
         fwdScramble = "";
@@ -740,7 +765,6 @@ Page {
         lastStopMs = now;
         phase = "idle";
         ready = false;
-        runTapPending = false;
         appendSolve(s);
         scrambleAfterSolve();
         noFade = false;
@@ -757,7 +781,7 @@ Page {
         popupN = idx + 1;
         popupOpen = true;
     }
-    function closeSolvePopup() { popupOpen = false; }
+    function closeSolvePopup() { popupOpen = false; popupHoldTimer.stop(); }
     function eventName(id) {
         for (var i = 0; i < events.length; i++) if (events[i].id === id) return events[i].name;
         return id;
@@ -794,7 +818,6 @@ Page {
     }
 
     function onRelease() {
-        pendingCollapse = false;
         var tableTap = tableTapPending && !histFlick.moving && !histFlick.flicking;
         tableTapPending = false;
         if (pinching) return;
@@ -809,8 +832,6 @@ Page {
     }
 
     function onTouchCanceled() {
-        runTapPending = false;
-        pendingCollapse = false;
         tableTapPending = false;
         if (phase === "holding") cancelHold();
     }
@@ -820,7 +841,6 @@ Page {
     // (no solve). Returns "consume" when the press is handled here, "none" otherwise.
     // A press while running is left to onPress (it stops the solve).
     function statsPress(x, y) {
-        pendingCollapse = false;
         tableTapPending = false;
         if (pinching || phase === "running") return "none";
         var p = touch.mapToItem(statsBox, x, y);
@@ -862,6 +882,9 @@ Page {
         repeat: true
         onTriggered: page.timeText = page.fmt(Date.now() - page.startMs)
     }
+
+    // Page-level background: covers flickable overshoot so it never shows the theme colour.
+    Rectangle { anchors.fill: parent; color: page.bgColor }
 
     SilicaFlickable {
         id: flick
@@ -912,7 +935,6 @@ Page {
 
             onPinchStarted: {
                 page.pinching = true;
-                page.runTapPending = false;
                 page.pinchBaseSize = page.timeSize;
                 if (page.phase === "holding") page.cancelHold();
             }
@@ -920,10 +942,7 @@ Page {
                 if (page.phase === "running") return;   // no zoom mid-solve
                 page.timeSize = page.clampSize(page.pinchBaseSize * pinch.scale);
             }
-            onPinchFinished: {
-                page.pinching = false;
-                page.persist();
-            }
+            onPinchFinished: page.pinching = false;   // zoom is not persisted
 
             MouseArea {
                 id: touch
@@ -962,7 +981,7 @@ Page {
 
         Rectangle {
             anchors.fill: parent
-            color: "#111114"
+            color: page.bgColor
             z: -1
         }
 
@@ -1161,15 +1180,15 @@ Page {
                     width: parent.width
                     height: scrambleVeil.bandH
                     gradient: Gradient {
-                        GradientStop { position: 0; color: "#00111114" }
-                        GradientStop { position: 1; color: "#ff111114" }
+                        GradientStop { position: 0; color: "#0023262c" }
+                        GradientStop { position: 1; color: "#ff23262c" }
                     }
                 }
                 Rectangle {
                     y: scrambleVeil.bandH
                     width: parent.width
                     height: parent.height - scrambleVeil.bandH
-                    color: "#111114"
+                    color: page.bgColor
                 }
             }
 
@@ -1266,7 +1285,6 @@ Page {
             height: page.histHeaderH * page.expandT + 4 * page.statsRowH
             opacity: page.idleOpacity
             Behavior on opacity { enabled: !page.noFade; NumberAnimation { duration: 150 } }
-            onWidthChanged: page.scrollHistToNewest()
 
             // Row labels, left edge of the block (both states). Empty header slot when collapsed.
             Column {
@@ -1311,8 +1329,14 @@ Page {
                 contentWidth: Math.max(width, histRow.width)
                 contentHeight: height
                 flickableDirection: Flickable.HorizontalFlick
-                onContentWidthChanged: page.scrollHistToNewest()
-                onWidthChanged: page.scrollHistToNewest()
+
+                // Auto-follow the newest column only if the table was already there (or within half a
+                // column of it). Otherwise the same columns stay in view when solves are added or
+                // changed. Collapsing and re-expanding resets to the newest column.
+                property bool followNewest: true
+                onContentXChanged: followNewest = contentX >= Math.max(0, contentWidth - width) - page.histColW / 2
+                onContentWidthChanged: if (followNewest) page.scrollHistToNewest()
+                onWidthChanged: if (followNewest) page.scrollHistToNewest()
                 onMovementStarted: flick.interactive = false
                 onMovementEnded: flick.interactive = true
 
@@ -1440,7 +1464,7 @@ Page {
                 width: parent.width - 2 * Theme.paddingLarge
                 height: eventList.height + 2 * Theme.paddingSmall
                 radius: Theme.paddingSmall
-                color: "#1c1c22"
+                color: page.panelColor
                 clip: true
 
                 ListView {
@@ -1472,7 +1496,7 @@ Page {
 
         // Session drop-down: opens right under the session row and overlays the
         // scramble/touch area only. Each session is a full-width row (ListView, scrolls
-        // when taller than 40% of the page). Left swipe on a row reveals Rename / Delete;
+        // when taller than 40% of the page). Left swipe on a row reveals Delete; long press renames;
         // one row open at a time; tap a row to pick it, tap outside to close.
         Item {
             id: sessionMenu
@@ -1502,7 +1526,7 @@ Page {
                 width: parent.width - 2 * Theme.paddingLarge
                 height: menuList.height + 2 * Theme.paddingSmall
                 radius: Theme.paddingSmall
-                color: "#1c1c22"
+                color: page.panelColor
                 clip: true
 
                 ListView {
@@ -1522,12 +1546,11 @@ Page {
                         height: Theme.itemSizeSmall
                         clip: true
                         readonly property int rowId: modelData.id
-                        // Compact actions: icon width + paddingMedium on each side, paddingSmall gap.
+                        // One compact action button: icon width + paddingMedium on each side.
                         readonly property real actionW: Theme.iconSizeMedium + 2 * Theme.paddingMedium
-                        readonly property real gap: Theme.paddingSmall
                         readonly property bool isOpen: page.openRowId === rowId
                         readonly property bool isRenaming: page.renamingId === rowId
-                        readonly property real openX: -(2 * actionW + gap)
+                        readonly property real openX: -actionW
                         property real baseX: 0
                         property real dragX: 0
                         property bool dragging: false
@@ -1538,38 +1561,25 @@ Page {
                             target: page
                             onPeekTickChanged: if (menuRow.isCurrentRow) peekAnim.restart()
                         }
-                        // Quick nudge left by ~itemSizeSmall (sliver of the buttons), then spring back.
+                        // Quick nudge left (reveals a sliver of the Delete button), then spring back.
                         SequentialAnimation {
                             id: peekAnim
-                            NumberAnimation { target: menuRow; property: "peekOffset"; to: -Theme.itemSizeSmall; duration: 200; easing.type: Easing.OutQuad }
+                            NumberAnimation { target: menuRow; property: "peekOffset"; to: -menuRow.actionW * 0.5; duration: 200; easing.type: Easing.OutQuad }
                             NumberAnimation { target: menuRow; property: "peekOffset"; to: 0; duration: 250; easing.type: Easing.OutBack }
                         }
 
-                        // Bottom layer: the Rename / Delete buttons (visual only, no input).
+                        // Bottom layer: the Delete button (visual only, no input).
                         Item {
                             id: actionsBox
                             anchors.right: parent.right
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
-                            width: 2 * menuRow.actionW + menuRow.gap
+                            width: menuRow.actionW
 
                             Rectangle {
-                                x: 0
-                                width: menuRow.actionW
-                                height: actionsBox.height
-                                color: "#2a2a33"
-                                // Visual only: the row's HSwipeArea (above) decides taps by x position.
-                                IconButton {
-                                    anchors.centerIn: parent
-                                    icon.source: "image://theme/icon-m-edit"
-                                    enabled: false
-                                }
-                            }
-                            Rectangle {
-                                x: menuRow.actionW + menuRow.gap
-                                width: menuRow.actionW
-                                height: actionsBox.height
+                                anchors.fill: parent
                                 color: "#7a1f1f"
+                                // Visual only: the row's HSwipeArea (above) decides taps by x position.
                                 IconButton {
                                     anchors.centerIn: parent
                                     icon.source: "image://theme/icon-m-delete"
@@ -1592,7 +1602,7 @@ Page {
 
                             Rectangle {
                                 anchors.fill: parent
-                                color: "#1c1c22"
+                                color: page.panelColor
                             }
 
                             Label {
@@ -1641,33 +1651,43 @@ Page {
                         //   tap on an open row's buttons    -> Rename (left) / Delete (right)
                         //   tap on a closed row             -> switch to that session, close menu
                         //   tap elsewhere while a row is open -> close that row
+                        // Top layer: the swipe / tap / long-press area. It receives every press on the row.
+                        //   swipe left (locked horizontal)   -> reveal Delete
+                        //   tap on the revealed Delete       -> delete the session
+                        //   tap on an open row elsewhere     -> close that row
+                        //   tap on a closed row              -> switch to that session, close menu
+                        //   long press (600 ms, no drag)     -> inline rename (Enter saves)
                         HSwipeArea {
                             id: rowArea
                             anchors.fill: parent
                             flickable: flick
                             flickable2: menuList
                             enabled: !menuRow.isRenaming
+                            holdMs: 600
+                            onLongPress: page.startRename(menuRow.rowId)
                             onDragStart: {
+                                // Start from where the row is now, so nothing jumps. While dragging the
+                                // row follows the finger (its x Behavior is disabled).
+                                peekAnim.stop();
+                                menuRow.peekOffset = 0;
                                 menuRow.baseX = menuRow.isOpen ? menuRow.openX : 0;
+                                menuRow.dragX = menuRow.baseX;
                                 menuRow.dragging = true;
                             }
                             onDragMove: menuRow.dragX = Math.max(menuRow.openX, Math.min(0, menuRow.baseX + dx))
                             onDragEnd: {
                                 var fin = Math.max(menuRow.openX, Math.min(0, menuRow.baseX + dx));
-                                menuRow.dragging = false;
+                                // Set the open state BEFORE leaving drag mode: x then animates once,
+                                // from the finger position to the final position (no double move).
                                 if (fin < menuRow.openX / 2) page.openRowId = menuRow.rowId;
                                 else if (page.openRowId === menuRow.rowId) page.openRowId = -1;
+                                menuRow.dragging = false;
                             }
                             onClicked: {
-                                if (rowArea.swiped) return;              // a swipe is not a tap
+                                if (rowArea.swiped || rowArea.longFired) return;   // a swipe / long press is not a tap
                                 if (menuRow.isOpen) {
-                                    if (mouse.x > menuRow.width - menuRow.actionW) {
-                                        page.deleteSessionById(menuRow.rowId);
-                                    } else if (mouse.x > menuRow.width - 2 * menuRow.actionW - menuRow.gap) {
-                                        page.startRename(menuRow.rowId);
-                                    } else {
-                                        page.openRowId = -1;
-                                    }
+                                    if (mouse.x > menuRow.width - menuRow.actionW) page.deleteSessionById(menuRow.rowId);
+                                    else page.openRowId = -1;
                                     return;
                                 }
                                 if (page.openRowId !== -1) page.openRowId = -1;
@@ -1699,7 +1719,7 @@ Page {
             anchors.centerIn: parent
             width: parent.width - 2 * Theme.horizontalPageMargin
             height: cardCol.height + 2 * Theme.paddingLarge
-            color: "#22222a"
+            color: page.panelColor
             radius: Theme.paddingMedium
             scale: page.popupOpen ? 1 : 0.9
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }

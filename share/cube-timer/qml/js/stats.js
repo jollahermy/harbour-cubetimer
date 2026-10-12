@@ -22,12 +22,27 @@ function aoValueAt(solves, end, n) {
     var recent = [];
     for (var i = end - n + 1; i <= end; i++) recent.push(effectiveMs(solves[i]));
     recent.sort(function (a, b) { return a - b; });   // Infinity sorts last
+    return aoFromSorted(recent, n);
+}
+
+// aoN of a window of n effective times, already sorted ascending.
+function aoFromSorted(sorted, n) {
     var drop = Math.ceil(n * 5 / 100);                 // integer maths: 5% of n, rounded up
-    var kept = recent.slice(drop, n - drop);           // drop best AND worst
+    var kept = sorted.slice(drop, n - drop);           // drop best AND worst
     if (kept[kept.length - 1] === Infinity) return Infinity;
     var sum = 0;
     for (var k = 0; k < kept.length; k++) sum += kept[k];
     return Math.floor(sum / kept.length / 10) * 10;    // truncate to centiseconds
+}
+
+// Index of the first element >= v in the ascending array a.
+function lowerBound(a, v) {
+    var lo = 0, hi = a.length;
+    while (lo < hi) {
+        var mid = (lo + hi) >> 1;
+        if (a[mid] < v) lo = mid + 1; else hi = mid;
+    }
+    return lo;
 }
 
 // Numeric aoN of the whole list (latest window), in ms; null if fewer than n solves.
@@ -51,7 +66,11 @@ function fmtMs(ms) {
 
 // Display text for aoN ending at index `end`: "12.34", "m:ss.cc", "DNF", or "-".
 function aoTextAt(solves, end, n) {
-    var v = aoValueAt(solves, end, n);
+    return valueText(aoValueAt(solves, end, n));
+}
+
+// Display text of a numeric aoN value (null -> "-", Infinity -> "DNF").
+function valueText(v) {
     if (v === null) return "-";
     if (v === Infinity) return "DNF";
     return fmtMs(v);
@@ -74,11 +93,28 @@ function solveText(s) {
 
 // Per solve (oldest first): {n: 1-based index, time, ao5, ao12, ao100} as display strings.
 // Each aoN is the average ending at that solve ("-" where fewer solves). O(n * 100 log 100).
+// Each aoN keeps its window sorted (binary insert/remove) instead of re-sorting the window for
+// every solve, so a session of 1000+ solves costs ~O(n * 100) instead of O(n * 100 log 100).
+// Output is identical to aoTextAt (checked in stats_check.js).
 function rollingAverages(solves) {
+    var WINS = [5, 12, 100];
+    var sorted = [[], [], []];
+    var vals = [];
     var out = [];
     for (var i = 0; i < solves.length; i++) {
-        out.push({ n: i + 1, time: solveText(solves[i]),
-                   ao5: aoTextAt(solves, i, 5), ao12: aoTextAt(solves, i, 12), ao100: aoTextAt(solves, i, 100) });
+        var v = effectiveMs(solves[i]);
+        vals.push(v);
+        var texts = [];
+        for (var w = 0; w < WINS.length; w++) {
+            var n = WINS[w], a = sorted[w];
+            a.splice(lowerBound(a, v), 0, v);
+            if (i >= n) {
+                var old = vals[i - n];                  // leaves the window
+                a.splice(lowerBound(a, old), 1);
+            }
+            texts.push(i + 1 >= n ? valueText(aoFromSorted(a, n)) : "-");
+        }
+        out.push({ n: i + 1, time: solveText(solves[i]), ao5: texts[0], ao12: texts[1], ao100: texts[2] });
     }
     return out;
 }
