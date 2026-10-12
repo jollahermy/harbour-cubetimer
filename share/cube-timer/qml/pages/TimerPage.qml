@@ -2,6 +2,7 @@ import QtQuick 2.0
 import Sailfish.Silica 1.0
 import QtQuick.LocalStorage 2.0 as Sql
 import QtFeedback 5.0
+import Nemo.KeepAlive 1.2
 import "../js/scramble.js" as Scramble
 import "../js/stats.js" as Stats
 import "../js/scrambleLayout.js" as Layout
@@ -11,6 +12,9 @@ Page {
     id: page
 
     // ---- font: Nunito (SIL OFL 1.1), bundled static TTFs (see fonts/OFL.txt) ----
+    // Keep the display on for the whole solve (hold + run); normal blanking otherwise.
+    DisplayBlanking { preventBlanking: page.phase === "holding" || page.phase === "running" }
+
     // Short haptic tick for long-press actions (copy scramble, rename session).
     ThemeEffect { id: buzz; effect: ThemeEffect.PressWeak }
 
@@ -1439,9 +1443,17 @@ Page {
                     delegate: BackgroundItem {
                         width: eventList.width
                         height: Theme.itemSizeSmall
-                        // Same press tint as the session rows (accent at 0.25).
-                        highlightedColor: Theme.rgba(page.accentColor, 0.25)
+                        // Press tint: inset rounded rect (same as the session rows), so it never pokes
+                        // out of the list's rounded corners. The default full-row highlight is off.
+                        highlightedColor: "transparent"
                         onClicked: page.pickEvent(index)
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: Theme.paddingSmall
+                            radius: Math.max(0, page.cornerRadius - Theme.paddingSmall)
+                            color: page.accentColor
+                            opacity: parent.down ? 0.25 : 0
+                        }
 
                         Label {
                             anchors.centerIn: parent
@@ -1573,6 +1585,8 @@ Page {
                             // not turned into a swipe, a vertical scroll or a long press (rename).
                             Rectangle {
                                 anchors.fill: parent
+                                anchors.margins: Theme.paddingSmall
+                                radius: Math.max(0, page.cornerRadius - Theme.paddingSmall)
                                 color: page.accentColor
                                 opacity: (rowArea.pressed && rowArea.mode === 0 && !rowArea.longFired) ? 0.25 : 0
                             }
