@@ -210,112 +210,92 @@ Page {
         return Math.min(maxTimeSize, Math.max(minTimeSize, v));
     }
 
-    // ---- scramble layout: monospace grid -------------------------------
-    // Tokens are padded to the widest token of the scramble, so columns line up.
-    // Only tokens followed by another token on the same row are padded, so the
-    // block has no trailing gap; scrambleText is centred, so left/right gaps match.
-    readonly property string monoFamily: "DejaVu Sans Mono"
+    // ---- scramble layout: cells (no monospace font) --------------------
+    // Every move token sits in its own fixed-width cell. The cell width is the widest token
+    // measured in Nunito (probes at 100 px, scaled linearly), so columns line up. The gap between
+    // cells is 0.5 em; tokens themselves get no letter spacing.
     readonly property real scrambleSideMargin: (currentEvent.id === "minx") ? Theme.paddingSmall : Theme.paddingMedium
     readonly property real scrambleMaxHeight: page.height * ((currentEvent.id === "minx") ? 0.38 : 0.35)
     readonly property real scrambleWidth: page.width - 2 * scrambleSideMargin
 
-    // Probes: one monospace char per size is measured from implicitWidth / 10.
-    Text { id: monoL; visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: "0123456789" }
-    Text { id: monoM; visible: false; font.pixelSize: Theme.fontSizeMedium; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeMedium) * page.trackK; text: "0123456789" }
-    Text { id: monoS; visible: false; font.pixelSize: Theme.fontSizeSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeSmall) * page.trackK; text: "0123456789" }
-    Text { id: monoX; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: "0123456789" }
-    // Megaminx: exact-text probe at 100 px holding the full padded 7-row block, so its
-    // implicitWidth/implicitHeight are the rendered block size scaled by px/100.
-    Text { id: megaProbe; visible: false; font.pixelSize: 100; font.family: page.appFont; font.letterSpacing: (100) * page.trackK; text: page.megaText }
-
-    // Split the scramble into rows of tokens; maxLen = widest token, maxTok = most tokens in a row.
+    // Split into rows of tokens (never empty rows).
     function parseScramble(text) {
         var srcLines = String(text).split("\n");
         var lines = [];
-        var maxLen = 1, maxTok = 1;
+        var maxTok = 1;
         for (var i = 0; i < srcLines.length; i++) {
             var toks = srcLines[i].split(/\s+/).filter(function (t) { return t.length > 0; });
             lines.push(toks);
             maxTok = Math.max(maxTok, toks.length);
-            for (var j = 0; j < toks.length; j++) maxLen = Math.max(maxLen, toks[j].length);
         }
-        return { lines: lines, maxLen: maxLen, maxTok: maxTok };
+        return { lines: lines, maxTok: maxTok };
     }
-    // Row text: every token except the last is padded to maxLen, then one space.
-    function padRow(toks, maxLen) {
-        var s = "";
-        for (var i = 0; i < toks.length; i++) {
-            var t = toks[i];
-            if (i < toks.length - 1) {
-                while (t.length < maxLen) t += " ";
-                s += t + " ";
-            } else {
-                s += t;
-            }
-        }
-        return s;
+    readonly property var scrambleLines: parseScramble(scramble).lines
+    readonly property var scrambleTokens: {
+        var all = [];
+        for (var i = 0; i < scrambleLines.length; i++)
+            for (var j = 0; j < scrambleLines[i].length; j++) all.push(scrambleLines[i][j]);
+        return all;
     }
-    // Width of a row in monospace characters (last token not padded).
-    function rowChars(toks, maxLen) {
-        return toks.length ? (toks.length - 1) * (maxLen + 1) + toks[toks.length - 1].length : 0;
+    // Probes at 100 px: one per token (widest token -> cell width), and one line for the line height.
+    Repeater {
+        id: tokProbe
+        model: page.scrambleTokens
+        Text { visible: false; font.family: page.appFont; font.pixelSize: 100; text: modelData }
     }
+    Text { id: lineProbe; visible: false; font.family: page.appFont; font.pixelSize: 100; text: "Ag" }
+    readonly property real tokW100: {
+        var m = 0;
+        for (var i = 0; i < tokProbe.count; i++) m = Math.max(m, tokProbe.itemAt(i).implicitWidth);
+        return m;
+    }
+    readonly property real lineH100: lineProbe.implicitHeight
 
-    // Generic fit: largest of [Large, Medium, Small, ExtraSmall] whose grid fits.
-    // Megaminx: one WCA line per row, never wrapped inside a line.
-    function fitScrambleGeneric(text) {
-        var probes = [ { px: Theme.fontSizeLarge, p: monoL },
-                       { px: Theme.fontSizeMedium, p: monoM },
-                       { px: Theme.fontSizeSmall, p: monoS },
-                       { px: Theme.fontSizeExtraSmall, p: monoX } ];
-        var noWrap = (page.currentEvent.id === "minx");
-        var parsed = parseScramble(text);
-        var lines = parsed.lines, maxLen = parsed.maxLen, maxPerLine = parsed.maxTok;
-        var best = null;
-        for (var k = 0; k < probes.length; k++) {
-            var cw = probes[k].p.implicitWidth / 10;          // one monospace char
-            var lh = probes[k].p.implicitHeight;              // one line
-            var cols = noWrap ? maxPerLine
-                              : Math.max(1, Math.floor((scrambleWidth + cw) / ((maxLen + 1) * cw)));
-            var out = [];
-            var widest = 0;
-            for (var r = 0; r < lines.length; r++) {
-                var row = lines[r];
-                for (var c = 0; c < row.length; c += cols) {
-                    var chunk = row.slice(c, c + cols);
-                    out.push(padRow(chunk, maxLen));
-                    widest = Math.max(widest, rowChars(chunk, maxLen) * cw);
-                }
+    // Cell layout at a pixel size. Generic events wrap rows to the width; megaminx (noWrap)
+    // keeps each WCA line in one row. Returns the rows plus the block size.
+    function layoutAt(px, noWrap) {
+        var cw = tokW100 * px / 100 * 1.04;               // 4 % headroom for hinted advances
+        var gap = px * 0.5;
+        var lh = lineH100 * px / 100;
+        var cols = noWrap ? Math.max(1, parseScramble(scramble).maxTok)
+                          : Math.max(1, Math.floor((scrambleWidth + gap) / (cw + gap)));
+        var rows = [];
+        var widest = 0;
+        for (var r = 0; r < scrambleLines.length; r++) {
+            var row = scrambleLines[r];
+            for (var c = 0; c < row.length; c += cols) {
+                var chunk = row.slice(c, c + cols);
+                rows.push(chunk);
+                widest = Math.max(widest, chunk.length * cw + (chunk.length - 1) * gap);
             }
-            var h = out.length * lh;
-            best = { text: out.join("\n"), size: probes[k].px,
-                     width: Math.min(widest, scrambleWidth), height: h };
-            if (h <= scrambleMaxHeight && widest <= scrambleWidth + 0.5) break;
+        }
+        return { rows: rows, size: px, cw: cw, gap: gap, lh: lh,
+                 width: Math.min(widest, scrambleWidth), widest: widest, height: rows.length * lh };
+    }
+    // Generic: largest of [Large, Medium, Small, ExtraSmall] whose block fits width and height.
+    function fitScrambleGeneric() {
+        var sizes = [Theme.fontSizeLarge, Theme.fontSizeMedium, Theme.fontSizeSmall, Theme.fontSizeExtraSmall];
+        var best = null;
+        for (var k = 0; k < sizes.length; k++) {
+            best = layoutAt(sizes[k], false);
+            if (best.height <= scrambleMaxHeight && best.widest <= scrambleWidth + 0.5) break;
         }
         return best;
     }
-    // Megaminx: one WCA line per row (7 rows), tokens padded per column, never wrapped.
-    readonly property string megaText: {
-        var parsed = parseScramble(scramble);
-        var rows = [];
-        for (var l = 0; l < parsed.lines.length; l++) rows.push(padRow(parsed.lines[l], parsed.maxLen));
-        return rows.join("\n");
-    }
-    // Largest integer px at which the block fits the width (page - 2*paddingSmall) and the height cap.
-    readonly property var megaFit: {
-        if (megaProbe.implicitWidth <= 0 || megaProbe.implicitHeight <= 0) return null;
-        var pxW = Math.floor(scrambleWidth * 100 / megaProbe.implicitWidth);
-        var pxH = Math.floor(scrambleMaxHeight * 100 / megaProbe.implicitHeight);
+    // Megaminx: 7 WCA lines, one row each, never wrapped; largest integer px that fits.
+    function fitMegaminx() {
+        if (tokW100 <= 0 || lineH100 <= 0) return null;
+        var w100 = layoutAt(100, true).widest;
+        var pxW = Math.floor(scrambleWidth * 100 / Math.max(1, w100));
+        var pxH = Math.floor(scrambleMaxHeight * 100 / Math.max(1, layoutAt(100, true).height));
         var px = Math.min(pxW, pxH);
         if (px < 8) return null;
-        return { text: megaText, size: px,
-                 width: megaProbe.implicitWidth * px / 100,
-                 height: megaProbe.implicitHeight * px / 100 };
+        return layoutAt(px, true);
     }
-    // Megaminx uses the 7-row layout; every other event uses the grid fit (unchanged).
+    // Megaminx uses the 7-row layout; every other event uses the generic fit.
     readonly property var scrambleFit: (page.currentEvent.id === "minx")
-        ? (megaFit || fitScrambleGeneric(scramble))
-        : fitScrambleGeneric(scramble)
-
+        ? (fitMegaminx() || fitScrambleGeneric())
+        : fitScrambleGeneric()
 
     // Penalty line under the time: about 40% of the time size, at least fontSizeLarge.
     readonly property real penaltySize: Math.max(Theme.fontSizeLarge, timeSize * 0.4)
@@ -810,12 +790,21 @@ Page {
     property bool popupOpen: false
     property var popupSolve: null                    // solve object shown in the popup
     property int popupN: 0                           // its 1-based index in the session
+    property int popupIndex: -1                      // 0-based index (used by the card's delete)
     function openSolvePopup(idx) {
         var ss = sessionSolves;
         if (idx < 0 || idx >= ss.length) return;
         popupSolve = ss[idx];
         popupN = idx + 1;
+        popupIndex = idx;
         popupOpen = true;
+    }
+    // Deletes one solve of the current session (any position). writeSolves refreshes the display
+    // (last solve fallback, stats, rolling averages), persists, and closes the popup.
+    function deleteSolveAt(idx) {
+        var ss = sessionSolves;
+        if (idx < 0 || idx >= ss.length) return;
+        writeSolves(ss.slice(0, idx).concat(ss.slice(idx + 1)));
     }
     function closeSolvePopup() { popupOpen = false; popupHoldTimer.stop(); }
     function eventName(id) {
@@ -1201,17 +1190,36 @@ Page {
                 height: scrambleBox.height
                 clip: true
 
-            Label {
+            Item {
                 id: scrambleText
                 anchors.top: parent.top
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: (page.currentEvent.id === "minx") ? implicitWidth : page.scrambleFit.width
-                text: page.scrambleFit.text
-                wrapMode: Text.NoWrap
-                horizontalAlignment: Text.AlignLeft
-                color: page.copyFlash ? page.accentColor : page.dimColor
-                font.pixelSize: page.scrambleFit.size; font.family: page.appFont; font.letterSpacing: (page.scrambleFit.size) * page.trackK
+                width: page.scrambleFit.width
+                height: page.scrambleFit.height
                 transform: Translate { id: scrambleShift; x: 0 }
+                Column {
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    Repeater {
+                        model: page.scrambleFit.rows
+                        Row {
+                            spacing: page.scrambleFit.gap
+                            Repeater {
+                                model: modelData
+                                Text {
+                                    width: page.scrambleFit.cw
+                                    height: page.scrambleFit.lh
+                                    text: modelData
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    font.family: page.appFont
+                                    font.pixelSize: page.scrambleFit.size
+                                    color: page.copyFlash ? page.accentColor : page.dimColor
+                                }
+                            }
+                        }
+                    }
+                }
             }
             }
 
@@ -1792,7 +1800,7 @@ Page {
                 spacing: Theme.paddingSmall
 
                 Label {
-                    width: parent.width
+                    width: parent.width - Theme.iconSizeSmall * 1.5
                     text: page.popupSolve ? ("#" + page.popupN + "  \u00b7  " + page.eventName(page.popupSolve.event)) : ""
                     color: page.lavenderColor
                     font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK
@@ -1854,6 +1862,30 @@ Page {
                         onReleased: popupHoldTimer.stop()
                         onCanceled: popupHoldTimer.stop()
                     }
+                }
+            }
+
+            // Delete mark, top-right corner: removes THIS solve immediately (closes the popup).
+            Item {
+                id: popupDelete
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: Theme.paddingSmall
+                width: Theme.iconSizeSmall * 1.3
+                height: width
+                Label {
+                    anchors.centerIn: parent
+                    text: "\u00d7"
+                    color: deleteMarkArea.pressed ? page.accentColor : page.dimColor
+                    font.pixelSize: Theme.iconSizeSmall * 1.1
+                    font.family: page.appFont
+                    font.letterSpacing: 0
+                }
+                MouseArea {
+                    id: deleteMarkArea
+                    anchors.fill: parent
+                    anchors.margins: -Theme.paddingSmall
+                    onClicked: page.deleteSolveAt(page.popupIndex)
                 }
             }
 
