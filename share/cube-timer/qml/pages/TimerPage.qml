@@ -172,9 +172,9 @@ Page {
     readonly property color lavenderColor: "#c8c2d8"   // secondary text: session name, labels, arrows
     readonly property color textColor: "#f4f1f8"       // primary text: event title, times, list names
     // Fixed dark background (soft plum-slate). Page, scramble veil and everything that must match use it.
-    readonly property color bgColor: "#2c2a33"
+    readonly property color bgColor: "#34313b"
     // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
-    readonly property color panelColor: "#38353f"
+    readonly property color panelColor: "#413d49"
     // One corner radius for every raised card: solve popup and both drop-down lists.
     readonly property real cornerRadius: Theme.paddingMedium
 
@@ -1026,7 +1026,7 @@ Page {
         Item {
             id: topRow
             anchors.top: parent.top
-            anchors.topMargin: Theme.paddingLarge * 2
+            anchors.topMargin: Theme.paddingLarge * 2 + Theme.paddingSmall
             anchors.left: parent.left
             anchors.right: parent.right
             height: eventButton.height + sessionRowItem.height
@@ -1036,7 +1036,7 @@ Page {
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: eventText.implicitHeight + Theme.paddingSmall
+                height: eventText.implicitHeight + Theme.paddingLarge
                 opacity: 1
                 Behavior on opacity { NumberAnimation { duration: 150 } }
                 // Half-width of name + arrow, measured from the page centre (the name is centred).
@@ -1873,13 +1873,14 @@ Page {
                 anchors.margins: Theme.paddingSmall
                 width: Theme.iconSizeSmall * 1.3
                 height: width
-                Label {
+                // Trash icon tinted via the theme image provider ("?<color>" suffix).
+                Image {
                     anchors.centerIn: parent
-                    text: "\u00d7"
-                    color: deleteMarkArea.pressed ? page.accentColor : page.dimColor
-                    font.pixelSize: Theme.iconSizeSmall * 1.1
-                    font.family: page.appFont
-                    font.letterSpacing: 0
+                    width: Theme.iconSizeSmall * 1.2
+                    height: width
+                    sourceSize.width: width
+                    sourceSize.height: height
+                    source: "image://theme/icon-m-delete?" + (deleteMarkArea.pressed ? page.accentColor : page.dimColor)
                 }
                 MouseArea {
                     id: deleteMarkArea
