@@ -1,6 +1,7 @@
 import QtQuick 2.0
 import Sailfish.Silica 1.0
 import QtQuick.LocalStorage 2.0 as Sql
+import QtFeedback 5.0
 import "../js/scramble.js" as Scramble
 import "../js/stats.js" as Stats
 import "../js/scrambleLayout.js" as Layout
@@ -10,6 +11,9 @@ Page {
     id: page
 
     // ---- font: Nunito (SIL OFL 1.1), bundled static TTFs (see fonts/OFL.txt) ----
+    // Short haptic tick for long-press actions (copy scramble, rename session).
+    ThemeEffect { id: buzz; effect: ThemeEffect.PressWeak }
+
     FontLoader {
         id: nunitoRegular
         source: Qt.resolvedUrl("../fonts/Nunito-Regular.ttf")
@@ -140,6 +144,7 @@ Page {
     function copyScramble(text) {
         if (!text || text === "(no scramble saved)") return;
         Clipboard.text = Layout.plainText(text);
+        buzz.play();                                   // short haptic tick
         copyFlash = true;
         copyFlashTimer.restart();
         copyNotice.opacity = 1;
@@ -476,6 +481,7 @@ Page {
         if (phase !== "idle") return;
         openRowId = -1;
         renamingId = sid;
+        buzz.play();                                   // short haptic tick
     }
     // Save a new name (empty text cancels). The internal id and the session counter are untouched.
     function confirmRename(sid, txt) {
