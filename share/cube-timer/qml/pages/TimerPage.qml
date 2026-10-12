@@ -1,6 +1,7 @@
 import QtQuick 2.0
 import Sailfish.Silica 1.0
 import QtQuick.LocalStorage 2.0 as Sql
+import QtGraphicalEffects 1.0
 import QtFeedback 5.0
 import Nemo.KeepAlive 1.2
 import "../js/scramble.js" as Scramble
@@ -10,6 +11,11 @@ import "../components"
 
 Page {
     id: page
+
+    // Look switch. true = native Sailfish style: the ambience shows through, colours come from
+    // Theme, lists and the popup use a Theme surface, the scramble wipe is a transparency mask.
+    // false = the fixed plum palette below, an opaque background and the colour veil wipe.
+    property bool systemStyle: true
 
     // ---- font: Nunito (SIL OFL 1.1), bundled static TTFs (see fonts/OFL.txt) ----
     // Keep the display on for the whole solve (hold + run); normal blanking otherwise.
@@ -130,7 +136,7 @@ Page {
     function setScrambleMode(m) {
         scrambleMode = m;
         scrambleText.opacity = (m === "normal") ? 1 : (m === "hidden" ? 0 : 0.3);
-        scrambleVeil.visible = (m === "sweep");
+        scrambleVeil.visible = (m === "sweep") && !page.systemStyle;
     }
     NumberAnimation {
         id: veilWipe
@@ -169,14 +175,21 @@ Page {
     // Fixed palette (independent of the system theme). Calm dark plum-slate, soft pastel accent.
     readonly property color notReadyColor: "#ff7b84"
     readonly property color readyColor: "#6fdc9a"
-    readonly property color dimColor: "#bfaebf"
-    readonly property color accentColor: "#ff9db8"     // interactive: pressed, current item, '+', copy flash
-    readonly property color lavenderColor: "#d8c3d6"   // secondary text: session name, labels, arrows
-    readonly property color textColor: "#f8f0f5"       // primary text: event title, times, list names
-    // Fixed dark background (soft plum-slate). Page, scramble veil and everything that must match use it.
-    readonly property color bgColor: "#38303a"
+    readonly property color dimColor: systemStyle ? Theme.secondaryColor : "#bfaebf"
+    readonly property color accentColor: systemStyle ? Theme.highlightColor : "#ff9db8"     // interactive: pressed, current item, '+', copy flash
+    readonly property color lavenderColor: systemStyle ? Theme.secondaryColor : "#d8c3d6"   // secondary text: session name, labels, arrows
+    readonly property color textColor: systemStyle ? Theme.primaryColor : "#f8f0f5"         // primary text: event title, times, list names
+    // Page background: none in the system style (the ambience shows); plum-slate otherwise.
+    // Page, scramble veil and everything that must match use it.
+    readonly property color bgColor: systemStyle ? "transparent" : "#38303a"
     // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
-    readonly property color panelColor: "#463b47"
+    // System style: Theme's dimmer surface (like Silica dialogs), slightly see-through.
+    readonly property color panelColor: systemStyle ? Theme.rgba(Theme.highlightDimmerColor, 0.9) : "#463b47"
+    // Press feedback fill (rows, '+' circle, event name). System style: Silica's pressed
+    // background; otherwise the accent at 25 %.
+    readonly property color pressFill: systemStyle
+        ? Theme.rgba(palette.highlightBackgroundColor, Theme.highlightBackgroundOpacity)
+        : Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.25)
     // One corner radius for every raised card: solve popup and both drop-down lists.
     readonly property real cornerRadius: Theme.paddingMedium
 
@@ -970,8 +983,8 @@ Page {
                     width: 2 * eventButton.halfW
                     height: parent.height + 2 * Theme.paddingMedium
                     radius: Theme.paddingSmall
-                    color: page.accentColor
-                    opacity: eventArea.pressed ? 0.25 : 0
+                    color: page.pressFill
+                    opacity: eventArea.pressed ? 1 : 0
                 }
 
                 // Event name: exactly centred on the page.
@@ -1063,8 +1076,8 @@ Page {
                             Rectangle {
                                 anchors.fill: parent
                                 radius: parent.radius
-                                color: page.accentColor
-                                opacity: addSessionArea.pressed ? 0.25 : 0
+                                color: page.pressFill
+                                opacity: addSessionArea.pressed ? 1 : 0
                             }
                         }
 
@@ -1109,6 +1122,10 @@ Page {
                 width: parent.width
                 height: scrambleBox.height
                 clip: true
+                // System style: the start wipe is a transparency mask (wipeMask) on this layer.
+                // Layer only while sweeping; the veil path is used otherwise.
+                layer.enabled: page.systemStyle && page.scrambleMode === "sweep"
+                layer.effect: OpacityMask { maskSource: wipeMask }
 
             ScrambleGrid {
                 id: scrambleText
@@ -1122,6 +1139,39 @@ Page {
                 ink: page.copyFlash ? page.accentColor : page.dimColor
                 transform: Translate { id: scrambleShift; x: 0 }
             }
+            }
+
+            // System-style wipe mask (used by scrambleWipe's OpacityMask, never drawn itself).
+            // Opaque above a soft band, the band fades from opaque (top) to transparent (bottom),
+            // transparent below. Its position is the veil's (veilShift.y, same 180 ms OutCubic
+            // move): starts with the band just under the box (all visible), moves up by
+            // (box height + band) so the transparent part eats the scramble from the bottom up.
+            Item {
+                id: wipeMask
+                visible: false
+                anchors.top: parent.top
+                width: parent.width
+                height: scrambleBox.height
+                Item {
+                    id: maskBand
+                    width: parent.width
+                    height: scrambleVeil.bandH
+                    y: scrambleBox.height
+                    transform: Translate { y: veilShift.y }
+                    Rectangle {                          // solid part above the band
+                        width: parent.width
+                        height: page.height
+                        y: -height
+                        color: "#ffffffff"
+                    }
+                    Rectangle {                          // soft band: opaque top -> transparent bottom
+                        anchors.fill: parent
+                        gradient: Gradient {
+                            GradientStop { position: 0; color: "#ffffffff" }
+                            GradientStop { position: 1; color: "#00ffffff" }
+                        }
+                    }
+                }
             }
 
             // Soft wipe veil: page-coloured, its top edge a fading band (same look as the hold
@@ -1232,6 +1282,22 @@ Page {
         // Drop-down name probes: the widest event / session name sets the minimum list width.
         Text { id: eventNameProbe;   visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: page.widestName(page.events) }
         Text { id: sessionNameProbe; visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: page.widestName(page.sessionMenuItems) }
+
+        // System style only: a faint dimmer under the bottom stats so the small numbers stay
+        // readable on bright ambiences. Fades in from nothing at its top edge; follows the stats.
+        Rectangle {
+            visible: page.systemStyle
+            z: 1
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: page.height * 0.25
+            gradient: Gradient {
+                GradientStop { position: 0; color: Theme.rgba(Theme.highlightDimmerColor, 0) }
+                GradientStop { position: 1; color: Theme.rgba(Theme.highlightDimmerColor, 0.3) }
+            }
+            opacity: statsBox.opacity
+        }
 
         // Stats block, bottom-right. Collapsed: [labels | time, ao5, ao12, ao100 of the latest solve].
         // Tap it to expand leftward: [labels | per-solve columns, newest at the right edge].
@@ -1467,8 +1533,8 @@ Page {
                             anchors.fill: parent
                             anchors.margins: Theme.paddingSmall
                             radius: Math.max(0, page.cornerRadius - Theme.paddingSmall)
-                            color: page.accentColor
-                            opacity: eventDelegate.down ? 0.25 : 0
+                            color: page.pressFill
+                            opacity: eventDelegate.down ? 1 : 0
                         }
 
                         Label {
@@ -1610,8 +1676,8 @@ Page {
                                 anchors.fill: parent
                                 anchors.margins: Theme.paddingSmall
                                 radius: Math.max(0, page.cornerRadius - Theme.paddingSmall)
-                                color: page.accentColor
-                                opacity: (rowArea.pressed && rowArea.mode === 0 && !rowArea.longFired) ? 0.25 : 0
+                                color: page.pressFill
+                                opacity: (rowArea.pressed && rowArea.mode === 0 && !rowArea.longFired) ? 1 : 0
                             }
 
                             Label {
