@@ -167,14 +167,14 @@ Page {
     // Fixed palette (independent of the system theme). Calm dark plum-slate, soft pastel accent.
     readonly property color notReadyColor: "#ff7b84"
     readonly property color readyColor: "#6fdc9a"
-    readonly property color dimColor: "#b3adc0"
-    readonly property color accentColor: "#ff9eaa"     // interactive: pressed, current item, '+', copy flash
-    readonly property color lavenderColor: "#c8c2d8"   // secondary text: session name, labels, arrows
-    readonly property color textColor: "#f4f1f8"       // primary text: event title, times, list names
+    readonly property color dimColor: "#bfaebf"
+    readonly property color accentColor: "#ff9db8"     // interactive: pressed, current item, '+', copy flash
+    readonly property color lavenderColor: "#d8c3d6"   // secondary text: session name, labels, arrows
+    readonly property color textColor: "#f8f0f5"       // primary text: event title, times, list names
     // Fixed dark background (soft plum-slate). Page, scramble veil and everything that must match use it.
-    readonly property color bgColor: "#34313b"
+    readonly property color bgColor: "#38303a"
     // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
-    readonly property color panelColor: "#413d49"
+    readonly property color panelColor: "#463b47"
     // One corner radius for every raised card: solve popup and both drop-down lists.
     readonly property real cornerRadius: Theme.paddingMedium
 
