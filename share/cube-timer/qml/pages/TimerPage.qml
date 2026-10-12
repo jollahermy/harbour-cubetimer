@@ -1077,10 +1077,8 @@ Page {
                             id: sessionLabel
                             anchors.centerIn: parent
                             text: page.sessionName
-                            // Accent when idle; primary while pressed; dimmed while a solve runs.
-                            color: sessionButton.enabled
-                                   ? (sessionButton.down ? Theme.primaryColor : Theme.highlightColor)
-                                   : Theme.secondaryColor
+                            // Soft secondary when idle; accent while pressed.
+                            color: sessionButton.down ? Theme.highlightColor : Theme.secondaryColor
                             font.pixelSize: Theme.fontSizeLarge
                         }
                     }
@@ -1101,7 +1099,7 @@ Page {
                             radius: width / 2
                             color: "transparent"
                             border.width: 2
-                            border.color: Theme.highlightColor
+                            border.color: addSessionArea.pressed ? Theme.highlightColor : Theme.secondaryColor
 
                             // pressed state: translucent fill
                             Rectangle {
@@ -1116,7 +1114,7 @@ Page {
                             anchors.centerIn: parent
                             text: "+"
                             font.pixelSize: Theme.fontSizeMedium
-                            color: Theme.highlightColor
+                            color: addSessionArea.pressed ? Theme.highlightColor : Theme.secondaryColor
                         }
 
                         // Tap area larger than the visible circle.
