@@ -8,6 +8,23 @@ import "../components"
 Page {
     id: page
 
+    // ---- font: Nunito (SIL OFL 1.1), bundled static TTFs (see fonts/OFL.txt) ----
+    FontLoader {
+        id: nunitoRegular
+        source: Qt.resolvedUrl("../fonts/Nunito-Regular.ttf")
+    }
+    FontLoader {
+        id: nunitoBold
+        source: Qt.resolvedUrl("../fonts/Nunito-Bold.ttf")
+    }
+    // Family for all text (Bold is picked from the same family by font.bold).
+    readonly property string appFont: (nunitoRegular.status === FontLoader.Ready && nunitoRegular.name !== "")
+                                      ? nunitoRegular.name : Theme.fontFamily
+    // Letter spacing as a fraction of the pixel size (0.04 em text, 0.02 em big time).
+    // Linear in size, so the 100 px probes scale exactly like the real text.
+    readonly property real trackK: 0.04
+    readonly property real trackBigK: 0.02
+
     // WCA events, in picker order. ids are the keys used by js/scramble.js.
     readonly property var events: [
         { id: "333",    name: "3x3" },
@@ -196,13 +213,13 @@ Page {
     readonly property real scrambleWidth: page.width - 2 * scrambleSideMargin
 
     // Probes: one monospace char per size is measured from implicitWidth / 10.
-    Text { id: monoL; visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeLarge; text: "0123456789" }
-    Text { id: monoM; visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeMedium; text: "0123456789" }
-    Text { id: monoS; visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeSmall; text: "0123456789" }
-    Text { id: monoX; visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: "0123456789" }
+    Text { id: monoL; visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: "0123456789" }
+    Text { id: monoM; visible: false; font.pixelSize: Theme.fontSizeMedium; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeMedium) * page.trackK; text: "0123456789" }
+    Text { id: monoS; visible: false; font.pixelSize: Theme.fontSizeSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeSmall) * page.trackK; text: "0123456789" }
+    Text { id: monoX; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: "0123456789" }
     // Megaminx: exact-text probe at 100 px holding the full padded 7-row block, so its
     // implicitWidth/implicitHeight are the rendered block size scaled by px/100.
-    Text { id: megaProbe; visible: false; font.family: page.monoFamily; font.pixelSize: 100; text: page.megaText }
+    Text { id: megaProbe; visible: false; font.pixelSize: 100; font.family: page.appFont; font.letterSpacing: (100) * page.trackK; text: page.megaText }
 
     // Split the scramble into rows of tokens; maxLen = widest token, maxTok = most tokens in a row.
     function parseScramble(text) {
@@ -910,21 +927,29 @@ Page {
             enabled: page.hasSolves
             visible: page.hasSolves
             MenuItem {
+
+                font.family: page.appFont; font.letterSpacing: font.pixelSize * page.trackK
                 text: "Delete"
                 enabled: page.canEditLast
                 onClicked: page.deleteSolve()
             }
             MenuItem {
+
+                font.family: page.appFont; font.letterSpacing: font.pixelSize * page.trackK
                 text: "OK"
                 enabled: page.canEditLast
                 onClicked: page.clearPenalty()
             }
             MenuItem {
+
+                font.family: page.appFont; font.letterSpacing: font.pixelSize * page.trackK
                 text: "DNF"
                 enabled: page.canEditLast
                 onClicked: page.setDnf()
             }
             MenuItem {
+
+                font.family: page.appFont; font.letterSpacing: font.pixelSize * page.trackK
                 text: "+2"
                 enabled: page.canEditLast
                 onClicked: page.addPlus2()
@@ -1042,7 +1067,7 @@ Page {
                     color: page.phase === "idle"
                            ? (eventArea.pressed ? Theme.highlightColor : Theme.primaryColor)
                            : Theme.secondaryColor
-                    font.pixelSize: Theme.fontSizeExtraLarge
+                    font.pixelSize: Theme.fontSizeExtraLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraLarge) * page.trackK
                     font.bold: true
                 }
 
@@ -1054,7 +1079,7 @@ Page {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "\u25BE"
                     color: Theme.secondaryColor
-                    font.pixelSize: Theme.fontSizeExtraLarge
+                    font.pixelSize: Theme.fontSizeExtraLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraLarge) * page.trackK
                 }
 
                 // One tap target for name + arrow: toggles the event drop-down.
@@ -1094,7 +1119,7 @@ Page {
                             text: page.sessionName
                             // Soft secondary when idle; accent while pressed.
                             color: sessionButton.down ? Theme.highlightColor : Theme.secondaryColor
-                            font.pixelSize: Theme.fontSizeLarge
+                            font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK
                         }
                     }
 
@@ -1128,7 +1153,7 @@ Page {
                         Label {
                             anchors.centerIn: parent
                             text: "+"
-                            font.pixelSize: Theme.fontSizeMedium
+                            font.pixelSize: Theme.fontSizeMedium; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeMedium) * page.trackK
                             color: addSessionArea.pressed ? Theme.highlightColor : Theme.secondaryColor
                         }
 
@@ -1176,8 +1201,7 @@ Page {
                 wrapMode: Text.NoWrap
                 horizontalAlignment: Text.AlignLeft
                 color: page.copyFlash ? Theme.highlightColor : page.dimColor
-                font.family: page.monoFamily
-                font.pixelSize: page.scrambleFit.size
+                font.pixelSize: page.scrambleFit.size; font.family: page.appFont; font.letterSpacing: (page.scrambleFit.size) * page.trackK
                 transform: Translate { id: scrambleShift; x: 0 }
             }
             }
@@ -1278,18 +1302,18 @@ Page {
 
         // Width probes (same fonts as the cells): the columns are only as wide as their widest
         // text (see the page-level statsLabelW / statsValueW / histColW properties).
-        Text { id: pl1; visible: false; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: "time" }
-        Text { id: pl2; visible: false; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: "ao5" }
-        Text { id: pl3; visible: false; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: "ao12" }
-        Text { id: pl4; visible: false; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: "ao100" }
-        Text { id: pvT;   visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: page.latestText }
-        Text { id: pv5;   visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: page.stats.ao5 }
-        Text { id: pv12;  visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: page.stats.ao12 }
-        Text { id: pv100; visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: page.stats.ao100 }
-        Text { id: pHist; visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: Stats.widthProbeText(page.history) }
+        Text { id: pl1; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: "time" }
+        Text { id: pl2; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: "ao5" }
+        Text { id: pl3; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: "ao12" }
+        Text { id: pl4; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: "ao100" }
+        Text { id: pvT;   visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: page.latestText }
+        Text { id: pv5;   visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: page.stats.ao5 }
+        Text { id: pv12;  visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: page.stats.ao12 }
+        Text { id: pv100; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: page.stats.ao100 }
+        Text { id: pHist; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: Stats.widthProbeText(page.history) }
         // Drop-down name probes: the widest event / session name sets the minimum list width.
-        Text { id: eventNameProbe;   visible: false; font.pixelSize: Theme.fontSizeLarge; text: page.widestName(page.events) }
-        Text { id: sessionNameProbe; visible: false; font.pixelSize: Theme.fontSizeLarge; text: page.widestName(page.sessionMenuItems) }
+        Text { id: eventNameProbe;   visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: page.widestName(page.events) }
+        Text { id: sessionNameProbe; visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: page.widestName(page.sessionMenuItems) }
 
         // Stats block, bottom-right. Collapsed: [labels | time, ao5, ao12, ao100 of the latest solve].
         // Tap it to expand leftward: [labels | per-solve columns, newest at the right edge].
@@ -1314,10 +1338,10 @@ Page {
                 anchors.bottom: parent.bottom
                 width: page.statsLabelW
                 Item { width: parent.width; height: page.histHeaderH * page.expandT }
-                Label { width: parent.width; height: page.statsRowH; text: "time"; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; horizontalAlignment: Text.AlignLeft }
-                Label { width: parent.width; height: page.statsRowH; text: "ao5"; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; horizontalAlignment: Text.AlignLeft }
-                Label { width: parent.width; height: page.statsRowH; text: "ao12"; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; horizontalAlignment: Text.AlignLeft }
-                Label { width: parent.width; height: page.statsRowH; text: "ao100"; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; horizontalAlignment: Text.AlignLeft }
+                Label { width: parent.width; height: page.statsRowH; text: "time"; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignLeft }
+                Label { width: parent.width; height: page.statsRowH; text: "ao5"; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignLeft }
+                Label { width: parent.width; height: page.statsRowH; text: "ao12"; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignLeft }
+                Label { width: parent.width; height: page.statsRowH; text: "ao100"; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignLeft }
             }
 
             // Collapsed values: latest solve and the three averages (right-aligned).
@@ -1328,10 +1352,10 @@ Page {
                 width: page.statsValueW
                 opacity: 1 - page.expandT
                 visible: opacity > 0
-                Label { width: parent.width; height: page.statsRowH; text: page.latestText; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.monoFamily; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
-                Label { width: parent.width; height: page.statsRowH; text: page.stats.ao5; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.monoFamily; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
-                Label { width: parent.width; height: page.statsRowH; text: page.stats.ao12; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.monoFamily; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
-                Label { width: parent.width; height: page.statsRowH; text: page.stats.ao100; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.monoFamily; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                Label { width: parent.width; height: page.statsRowH; text: page.latestText; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                Label { width: parent.width; height: page.statsRowH; text: page.stats.ao5; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                Label { width: parent.width; height: page.statsRowH; text: page.stats.ao12; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                Label { width: parent.width; height: page.statsRowH; text: page.stats.ao100; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
             }
 
             // Expanded history: one column per solve of the session, oldest at the left.
@@ -1375,11 +1399,11 @@ Page {
                                 anchors.top: parent.top
                                 anchors.right: parent.right
                                 width: page.histColW
-                                Label { width: parent.width - Theme.paddingMedium; height: page.histHeaderH; text: "#" + modelData.n; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeTiny; horizontalAlignment: Text.AlignRight }
-                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.time; color: Theme.primaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.monoFamily; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
-                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao5; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.monoFamily; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
-                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao12; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.monoFamily; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
-                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao100; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.monoFamily; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                                Label { width: parent.width - Theme.paddingMedium; height: page.histHeaderH; text: "#" + modelData.n; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeTiny; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeTiny) * page.trackK; horizontalAlignment: Text.AlignRight }
+                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.time; color: Theme.primaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao5; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao12; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao100; color: Theme.secondaryColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
                             }
                             // Tap on a history column, inside the Flickable content. Qt emits clicked
                             // only when the Flickable did not take the press over as a drag.
@@ -1405,8 +1429,7 @@ Page {
         Text {
             id: sizeProbe
             visible: false
-            font.family: Theme.fontFamily
-            font.pixelSize: 100
+            font.pixelSize: 100; font.family: page.appFont; font.letterSpacing: (100) * page.trackBigK
             font.bold: true
             text: "9:59.99"
         }
@@ -1433,7 +1456,7 @@ Page {
             fontSizeMode: Text.HorizontalFit
             minimumPixelSize: Theme.fontSizeTiny
             text: page.timeText
-            font.pixelSize: page.timeSize
+            font.pixelSize: page.timeSize; font.family: page.appFont; font.letterSpacing: (page.timeSize) * page.trackBigK
             font.bold: true
             color: page.phase === "holding"
                    ? (page.ready ? page.readyColor : page.notReadyColor)
@@ -1451,7 +1474,7 @@ Page {
             minimumPixelSize: Theme.fontSizeTiny
             text: page.subText
             color: page.dimColor
-            font.pixelSize: page.penaltySize
+            font.pixelSize: page.penaltySize; font.family: page.appFont; font.letterSpacing: (page.penaltySize) * page.trackK
         }
 
         // Event drop-down: opens right under the event row. Full-width rows, centred names,
@@ -1509,7 +1532,7 @@ Page {
                             anchors.centerIn: parent
                             text: modelData.name
                             color: index === page.eventIndex ? Theme.highlightColor : Theme.primaryColor
-                            font.pixelSize: Theme.fontSizeLarge
+                            font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK
                         }
                     }
                 }
@@ -1636,7 +1659,7 @@ Page {
                                 elide: Text.ElideRight
                                 text: modelData.name
                                 visible: !menuRow.isRenaming
-                                font.pixelSize: Theme.fontSizeLarge
+                                font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK
                                 color: modelData.index === page.currentSession
                                        ? Theme.highlightColor : Theme.primaryColor
                             }
@@ -1651,7 +1674,7 @@ Page {
                                 visible: menuRow.isRenaming
                                 enabled: menuRow.isRenaming
                                 text: modelData.name
-                                font.pixelSize: Theme.fontSizeMedium
+                                font.pixelSize: Theme.fontSizeMedium; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeMedium) * page.trackK
                                 EnterKey.onClicked: {
                                     page.confirmRename(menuRow.rowId, text);
                                     focus = false;
@@ -1763,7 +1786,7 @@ Page {
                     width: parent.width
                     text: page.popupSolve ? ("#" + page.popupN + "  \u00b7  " + page.eventName(page.popupSolve.event)) : ""
                     color: Theme.secondaryColor
-                    font.pixelSize: Theme.fontSizeExtraSmall
+                    font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK
                     horizontalAlignment: Text.AlignLeft
                 }
                 // Time line: big main value, smaller suffix on the same line, centred as a unit.
@@ -1779,8 +1802,7 @@ Page {
                         color: Theme.primaryColor
                         fontSizeMode: Text.HorizontalFit
                         minimumPixelSize: Theme.fontSizeMedium
-                        font.pixelSize: Theme.fontSizeHuge
-                        font.family: page.monoFamily
+                        font.pixelSize: Theme.fontSizeHuge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeHuge) * page.trackBigK
                         horizontalAlignment: Text.AlignHCenter
                     }
                     Label {
@@ -1791,8 +1813,7 @@ Page {
                         anchors.baseline: popupBig.baseline
                         text: page.popupSuffix(page.popupSolve)
                         color: Theme.secondaryColor
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.family: page.monoFamily
+                        font.pixelSize: Theme.fontSizeMedium; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeMedium) * page.trackK
                     }
                 }
                 Item { width: 1; height: Theme.paddingMedium }
@@ -1802,8 +1823,7 @@ Page {
                     text: page.scrambleOf(page.popupSolve)
                     color: page.copyFlash ? Theme.highlightColor : Theme.primaryColor
                     wrapMode: Text.WordWrap
-                    font.family: page.monoFamily
-                    font.pixelSize: (page.scrambleOf(page.popupSolve).length > 120) ? Theme.fontSizeExtraSmall : Theme.fontSizeSmall
+                    font.pixelSize: (page.scrambleOf(page.popupSolve).length > 120) ? Theme.fontSizeExtraSmall : Theme.fontSizeSmall; font.family: page.appFont; font.letterSpacing: ((page.scrambleOf(page.popupSolve).length > 120) ? Theme.fontSizeExtraSmall : Theme.fontSizeSmall) * page.trackK
                     horizontalAlignment: Text.AlignHCenter
 
                     // Long press copies; the popup stays open. Presses here never reach the card/dim.
@@ -1846,7 +1866,7 @@ Page {
         opacity: 0
         text: qsTr("Copied")
         color: Theme.highlightColor
-        font.pixelSize: Theme.fontSizeSmall
+        font.pixelSize: Theme.fontSizeSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeSmall) * page.trackK
         x: (page.width - width) / 2
         // Under the scramble on the main page, under the card while the popup is open.
         y: page.popupOpen ? (solveCard.y + solveCard.height + Theme.paddingMedium)
