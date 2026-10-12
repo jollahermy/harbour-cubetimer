@@ -14,6 +14,7 @@ Page {
         id: nunitoRegular
         source: Qt.resolvedUrl("../fonts/Nunito-Regular.ttf")
     }
+    // Bold face: registered so font.bold resolves inside the Nunito family (not referenced by id).
     FontLoader {
         id: nunitoBold
         source: Qt.resolvedUrl("../fonts/Nunito-Bold.ttf")
@@ -393,7 +394,7 @@ Page {
         if (ridIdx >= 0) idx = ridIdx;
         if (idx < 0) {
             var all = sessions.slice();
-            all.push({ id: nextId(), name: "Session 1", event: currentEvent.id,
+            all.push({ id: nextId(), name: "Session " + nextSessionNumber(), event: currentEvent.id,
                        created: Date.now(), solves: [] });
             sessions = all;
             idx = all.length - 1;
@@ -436,7 +437,10 @@ Page {
         eventMenuOpen = !eventMenuOpen;
     }
     function closeEventMenu() { eventMenuOpen = false; }
-    function pickEvent(i) { eventMenuOpen = false; selectEvent(i); }
+    function pickEvent(i) {
+        eventMenuOpen = false;
+        if (i !== eventIndex) selectEvent(i);
+    }
     // Inline session drop-down under the session row (no separate page).
     property bool sessionMenuOpen: false
     readonly property var sessionMenuItems: listSessionsForEvent()
@@ -734,20 +738,12 @@ Page {
         return "";
     }
 
-    // Single-finger touch handling. Presses during a pinch are ignored.
-    // While running, a tap stops the solve on RELEASE, so a pinch
-    // (which cancels the MouseArea press) never stops the timer.
-    // A press while running stops the solve at once (time taken at the press). That touch's
-    // release then finds phase idle and does nothing, so it cannot arm a new hold; a new press
-    // is needed for that. Presses within cooldownMs of a stop are ignored.
+    // Single-finger touch handling (the touch MouseArea). Presses during a pinch are ignored.
+    // While running, the full-page stop layer takes every press, so this is never reached then.
+    // Presses within cooldownMs of a stop are ignored.
     function onPress() {
         if (pinching) return;
-        var now = Date.now();
-        if (phase === "running") {
-            stopSolve(now);
-            return;
-        }
-        if (now - lastStopMs < cooldownMs) return;
+        if (Date.now() - lastStopMs < cooldownMs) return;
         if (phase === "idle") beginHold();
     }
 
@@ -913,7 +909,8 @@ Page {
             anchors.fill: pinchArea
             readonly property real fadeBand: Theme.paddingLarge * 3.2   // ~1.6x the old 2 x paddingLarge (~75 px -> ~120 px)
             // Alpha is part of the tint (red ~0.10, green ~0.12), so it animates with the colour.
-            property color tint: page.ready ? "#1f6fdc9a" : "#1aff7b84"
+            property color tint: page.ready ? Qt.rgba(page.readyColor.r, page.readyColor.g, page.readyColor.b, 0.12)
+                                            : Qt.rgba(page.notReadyColor.r, page.notReadyColor.g, page.notReadyColor.b, 0.10)
             Behavior on tint { ColorAnimation { duration: 120 } }
             gradient: Gradient {
                 GradientStop { position: 0; color: Qt.rgba(holdHighlight.tint.r, holdHighlight.tint.g, holdHighlight.tint.b, 0) }
@@ -1298,7 +1295,7 @@ Page {
                     anchors.right: parent.right
                     height: page.histHeaderH + 4 * page.statsRowH
                     Repeater {
-                        model: page.history.length > 0 ? page.history : page.emptyHist
+                        model: page.expandT > 0 ? (page.history.length > 0 ? page.history : page.emptyHist) : []
                         Item {
                             width: page.histColW
                             height: histRow.height
@@ -1367,7 +1364,7 @@ Page {
             font.bold: true
             color: page.phase === "holding"
                    ? (page.ready ? page.readyColor : page.notReadyColor)
-                   : "#f4f1f8"
+                   : page.textColor
         }
 
         // Penalty line under the big time: DNF raw time or +2 total.
@@ -1385,7 +1382,7 @@ Page {
         }
 
         // Event drop-down: opens right under the event row. Full-width rows, centred names,
-        // current event in highlightColor, max 40% of the page then scrolls. No swipe actions.
+        // current event in accentColor, max 40% of the page then scrolls. No swipe actions.
         // Tap a row = select that event and close; tap outside = close.
         Item {
             id: eventMenu
