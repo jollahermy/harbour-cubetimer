@@ -144,13 +144,23 @@ Page {
 
     readonly property int readyDelayMs: 550          // hold time before green
     readonly property int cooldownMs: 300            // ignore touches after stop
-    readonly property color notReadyColor: "#ff4d4d"
-    readonly property color readyColor: "#4dff88"
-    readonly property color dimColor: "#9a9aa3"
+    readonly property color notReadyColor: "#ff6b6b"
+    readonly property color readyColor: "#5fd17a"
+    readonly property color dimColor: "#a6a6af"
     // Fixed dark background (dark slate grey). Page, scramble veil and everything that must match use it.
-    readonly property color bgColor: "#23262c"
+    readonly property color bgColor: "#2a2d34"
     // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
-    readonly property color panelColor: "#2e323a"
+    readonly property color panelColor: "#353943"
+
+    // Longest text in a list model (drop-down width probe).
+    function widestName(items) {
+        var best = "";
+        for (var i = 0; i < items.length; i++) {
+            var n = String(items[i].name || "");
+            if (n.length > best.length) best = n;
+        }
+        return best;
+    }
 
     // ---- time font size -------------------------------------------------
     // Min: Theme.fontSizeExtraLarge. Default: 2.5 x Theme.fontSizeHuge.
@@ -963,19 +973,22 @@ Page {
             }
         }
 
-        // Faint highlight of the touch region while holding. Top edge is a short
-        // soft fade (transparent -> highlight over ~2 x paddingLarge), then solid.
+        // Faint highlight of the touch region while holding. Tint follows the hold state:
+        // soft red while not ready, soft green when ready (120 ms colour change). Top edge is a
+        // short soft fade (transparent -> tint over ~2 x paddingLarge), then solid.
         Rectangle {
             id: holdHighlight
             anchors.fill: pinchArea
             readonly property real fadeBand: Theme.paddingLarge * 3.2   // ~1.6x the old 2 x paddingLarge (~75 px -> ~120 px)
-            readonly property color hc: Theme.highlightBackgroundColor
+            // Alpha is part of the tint (red ~0.10, green ~0.12), so it animates with the colour.
+            property color tint: page.ready ? "#1f4caf50" : "#1ad9534f"
+            Behavior on tint { ColorAnimation { duration: 120 } }
             gradient: Gradient {
-                GradientStop { position: 0; color: Qt.rgba(holdHighlight.hc.r, holdHighlight.hc.g, holdHighlight.hc.b, 0) }
-                GradientStop { position: Math.min(0.5, holdHighlight.fadeBand / Math.max(1, holdHighlight.height)); color: holdHighlight.hc }
-                GradientStop { position: 1; color: holdHighlight.hc }
+                GradientStop { position: 0; color: Qt.rgba(holdHighlight.tint.r, holdHighlight.tint.g, holdHighlight.tint.b, 0) }
+                GradientStop { position: Math.min(0.5, holdHighlight.fadeBand / Math.max(1, holdHighlight.height)); color: holdHighlight.tint }
+                GradientStop { position: 1; color: holdHighlight.tint }
             }
-            opacity: page.phase === "holding" ? 0.12 : 0
+            opacity: page.phase === "holding" ? 1 : 0
             Behavior on opacity { FadeAnimation { duration: 120 } }
         }
 
@@ -1183,8 +1196,8 @@ Page {
                     width: parent.width
                     height: scrambleVeil.bandH
                     gradient: Gradient {
-                        GradientStop { position: 0; color: "#0023262c" }
-                        GradientStop { position: 1; color: "#ff23262c" }
+                        GradientStop { position: 0; color: Qt.rgba(page.bgColor.r, page.bgColor.g, page.bgColor.b, 0) }
+                        GradientStop { position: 1; color: page.bgColor }
                     }
                 }
                 Rectangle {
@@ -1272,6 +1285,9 @@ Page {
         Text { id: pv12;  visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: page.stats.ao12 }
         Text { id: pv100; visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: page.stats.ao100 }
         Text { id: pHist; visible: false; font.family: page.monoFamily; font.pixelSize: Theme.fontSizeExtraSmall; text: Stats.widthProbeText(page.history) }
+        // Drop-down name probes: the widest event / session name sets the minimum list width.
+        Text { id: eventNameProbe;   visible: false; font.pixelSize: Theme.fontSizeLarge; text: page.widestName(page.events) }
+        Text { id: sessionNameProbe; visible: false; font.pixelSize: Theme.fontSizeLarge; text: page.widestName(page.sessionMenuItems) }
 
         // Stats block, bottom-right. Collapsed: [labels | time, ao5, ao12, ao100 of the latest solve].
         // Tap it to expand leftward: [labels | per-solve columns, newest at the right edge].
@@ -1464,7 +1480,8 @@ Page {
                 anchors.top: parent.top
                 anchors.topMargin: Theme.paddingSmall
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width - 2 * Theme.paddingLarge
+                width: Math.min(page.width - 2 * Theme.horizontalPageMargin,
+                                Math.max(page.width * 0.7, eventNameProbe.implicitWidth + 2 * Theme.paddingLarge))
                 height: eventList.height + 2 * Theme.paddingSmall
                 radius: Theme.paddingSmall
                 color: page.panelColor
@@ -1526,7 +1543,8 @@ Page {
                 anchors.top: parent.top
                 anchors.topMargin: Theme.paddingSmall
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width - 2 * Theme.paddingLarge
+                width: Math.min(page.width - 2 * Theme.horizontalPageMargin,
+                                Math.max(page.width * 0.7, sessionNameProbe.implicitWidth + 2 * Theme.paddingLarge))
                 height: menuList.height + 2 * Theme.paddingSmall
                 radius: Theme.paddingSmall
                 color: page.panelColor
