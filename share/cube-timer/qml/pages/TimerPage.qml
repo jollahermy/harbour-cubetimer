@@ -151,6 +151,8 @@ Page {
     readonly property color bgColor: "#2a2d34"
     // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
     readonly property color panelColor: "#353943"
+    // One corner radius for every raised card: solve popup and both drop-down lists.
+    readonly property real cornerRadius: Theme.paddingMedium
 
     // Longest text in a list model (drop-down width probe).
     function widestName(items) {
@@ -1483,7 +1485,7 @@ Page {
                 width: Math.min(page.width - 2 * Theme.horizontalPageMargin,
                                 Math.max(page.width * 0.7, eventNameProbe.implicitWidth + 2 * Theme.paddingLarge))
                 height: eventList.height + 2 * Theme.paddingSmall
-                radius: Theme.paddingSmall
+                radius: page.cornerRadius
                 color: page.panelColor
                 clip: true
 
@@ -1546,7 +1548,7 @@ Page {
                 width: Math.min(page.width - 2 * Theme.horizontalPageMargin,
                                 Math.max(page.width * 0.7, sessionNameProbe.implicitWidth + 2 * Theme.paddingLarge))
                 height: menuList.height + 2 * Theme.paddingSmall
-                radius: Theme.paddingSmall
+                radius: page.cornerRadius
                 color: page.panelColor
                 clip: true
 
@@ -1744,7 +1746,7 @@ Page {
             width: parent.width - 2 * Theme.horizontalPageMargin
             height: cardCol.height + 2 * Theme.paddingLarge
             color: page.panelColor
-            radius: Theme.paddingMedium
+            radius: page.cornerRadius
             scale: page.popupOpen ? 1 : 0.9
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
             MouseArea { anchors.fill: parent }      // taps on the card do not close it
