@@ -494,6 +494,9 @@ Page {
     function cancelRename() {
         renamingId = -1;
     }
+    // The inline rename field (set by the session row that is renaming); the rename blocker
+    // lets presses inside it through.
+    property var renameFieldItem: null
 
     // Delete a session (by id). Other sessions keep their names. If it was the current
     // one, switch to the most recent remaining session of this event, or create the next
@@ -1430,6 +1433,8 @@ Page {
                     delegate: BackgroundItem {
                         width: eventList.width
                         height: Theme.itemSizeSmall
+                        // Same press tint as the session rows (accent at 0.25).
+                        highlightedColor: Theme.rgba(page.accentColor, 0.25)
                         onClicked: page.pickEvent(index)
 
                         Label {
@@ -1554,6 +1559,13 @@ Page {
                                 anchors.fill: parent
                                 color: page.panelColor
                             }
+                            // Press feedback: accent tint while the finger is down and the press has
+                            // not turned into a swipe, a vertical scroll or a long press (rename).
+                            Rectangle {
+                                anchors.fill: parent
+                                color: page.accentColor
+                                opacity: (rowArea.pressed && rowArea.mode === 0 && !rowArea.longFired) ? 0.25 : 0
+                            }
 
                             Label {
                                 id: menuRowLabel
@@ -1591,6 +1603,7 @@ Page {
                                 onVisibleChanged: {
                                     if (visible) {
                                         text = modelData.name;
+                                        page.renameFieldItem = renameField;
                                         forceActiveFocus();
                                     }
                                 }
@@ -1670,6 +1683,32 @@ Page {
         enabled: page.phase === "running"
         visible: enabled
         onPressed: page.stopSolve(Date.now())
+    }
+
+    // ---- rename input blocker (only while renaming a session) -------------
+    // Full-page layer above the drop-downs and all page content (below the popup). A press
+    // outside the rename field cancels the rename and is swallowed, so nothing underneath
+    // (buttons, session rows, '+', event selector, touch area, pull-down) reacts. A press
+    // inside the field is not accepted, so it passes through to the TextField.
+    // The keyboard is system UI (the page is not resized), so it is not covered by the app.
+    MouseArea {
+        id: renameBlocker
+        anchors.fill: parent
+        z: 16
+        enabled: page.renamingId !== -1
+        visible: enabled
+        onPressed: {
+            var f = page.renameFieldItem;
+            if (f && f.visible) {
+                var p = mapToItem(f, mouse.x, mouse.y);
+                if (p.x >= 0 && p.y >= 0 && p.x <= f.width && p.y <= f.height) {
+                    mouse.accepted = false;
+                    return;
+                }
+            }
+            if (f) f.focus = false;
+            page.cancelRename();
+        }
     }
 
     // ---- solve detail popup overlay -----------------------------------

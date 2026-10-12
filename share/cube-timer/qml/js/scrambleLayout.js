@@ -3,10 +3,11 @@
 // Scramble layout maths for the cube timer (pure JS, no QML).
 //
 // Metrics m are measured in QML at 100 px and scale linearly with the pixel size:
-//   { tokW, lineH, parenW, numW, commaW, slashW }
+//   { tokW, lineH, parenW, numW, commaW, slashW, slashPad }
 //   tokW   widest generic token (cell width basis)     lineH  line height
 //   parenW '(' / ')' width   numW  widest Square-1 number ('-5' or longer)
 //   commaW ',' width         slashW '/' width
+//   slashPad  px space on each side of the Square-1 '/' (fixed, not scaled with the font)
 //
 // Three layouts, all returning { mode, rows, size, width, widest, height, gap, lh, ... }:
 //   generic : tokens in fixed-width cells (rows wrap to the width)
@@ -86,8 +87,10 @@ function layoutAt(prep, m, px, noWrap, width) {
              width: Math.min(widest, width), widest: widest, height: rows.length * lh };
 }
 
-// Square-1 layout at a pixel size. A cell is one move "(a,b)" followed by a narrow slash column;
-// the numbers sit in fixed sub-cells sized for the widest number, so commas line up in every row.
+// Square-1 layout at a pixel size. A cell is one move "(a,b)" followed by a slash column
+// (slash centred, slashPad on each side). The column carries the space between moves, so a '/'
+// has the same space to its left and right and the row gap is 0. The numbers sit centred in
+// sub-cells sized for the widest number, so the commas line up in every row.
 // Rows hold as many cells as fit the width (cells keep their own width, rows are left-aligned).
 function layoutSq1(prep, m, px, width) {
     var k = px / 100;
@@ -95,9 +98,10 @@ function layoutSq1(prep, m, px, width) {
     var numW = m.numW * k;
     var commaW = m.commaW * k;
     var moveW = 2 * parenW + 2 * numW + commaW;
-    var sepW = m.slashW * k * 1.3;                    // slash column: slash width + headroom
+    var padW = m.slashPad || 0;
+    var sepW = m.slashW * k + 2 * padW;               // slash column: slash + equal pad each side
     var cellW = moveW + sepW;
-    var gap = px * 0.6;
+    var gap = 0;
     var lh = m.lineH * k;
     var cols = Math.max(1, Math.floor((width + gap) / (cellW + gap)));
     var rows = [];

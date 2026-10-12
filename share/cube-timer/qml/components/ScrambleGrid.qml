@@ -6,8 +6,8 @@ import "../js/scrambleLayout.js" as Layout
 // js/scrambleLayout.js (fit to maxWidth x maxHeight, largest size first):
 //   generic : fixed-width token cells, rows wrap to the width
 //   minx    : megaminx, one WCA line per row, never wrapped
-//   sq1     : "(a,b)" moves with a '/' column after each move; numbers right-aligned in
-//             sub-cells sized for the widest number, so the commas line up.
+//   sq1     : "(a,b)" moves with a '/' column after each move (slash centred, equal pad each
+//             side); numbers centred in sub-cells sized for the widest number, so the commas line up.
 // Root size = the fitted block (width x height); the parent centres or positions it.
 Item {
     id: grid
@@ -49,7 +49,8 @@ Item {
         parenW: pParen.implicitWidth,
         commaW: pComma.implicitWidth,
         slashW: pSlash.implicitWidth,
-        numW: Math.max(pDigit.implicitWidth, widestOf(numProbe))
+        numW: Math.max(pDigit.implicitWidth, widestOf(numProbe)),
+        slashPad: Theme.paddingSmall
     })
     readonly property var fit: Layout.fit(prep, metrics, maxWidth, maxHeight, sizes)
 
@@ -95,13 +96,13 @@ Item {
                         width: grid.fit.cellW
                         height: grid.fit.lh
                         Row {
-                            // Fixed sub-cells: numbers right-aligned in the cell sized for the widest number.
+                            // Fixed sub-cells: numbers centred in the cell sized for the widest number.
                             Repeater {
                                 model: [
                                     { w: grid.fit.parenW, t: "(", al: Text.AlignLeft },
-                                    { w: grid.fit.numW, t: modelData.a, al: Text.AlignRight },
+                                    { w: grid.fit.numW, t: modelData.a, al: Text.AlignHCenter },
                                     { w: grid.fit.commaW, t: ",", al: Text.AlignHCenter },
-                                    { w: grid.fit.numW, t: modelData.b, al: Text.AlignRight },
+                                    { w: grid.fit.numW, t: modelData.b, al: Text.AlignHCenter },
                                     { w: grid.fit.parenW, t: ")", al: Text.AlignLeft }
                                 ]
                                 Text {
@@ -118,7 +119,7 @@ Item {
                         }
                         Text {
                             x: grid.fit.moveW
-                            width: grid.fit.sepW
+                            width: grid.fit.sepW                // centred: equal pad each side
                             height: grid.fit.lh
                             text: modelData.slash ? "/" : ""
                             horizontalAlignment: Text.AlignHCenter
