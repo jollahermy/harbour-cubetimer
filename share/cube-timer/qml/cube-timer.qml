@@ -16,7 +16,7 @@ ApplicationWindow {
     cover: CoverBackground {
         Image {
             anchors.centerIn: parent
-            width: parent.width * 0.55
+            width: parent.width * 0.4
             height: width
             sourceSize.width: width
             sourceSize.height: height
