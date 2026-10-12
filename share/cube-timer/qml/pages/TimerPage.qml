@@ -27,14 +27,14 @@ Page {
 
     // WCA events, in picker order. ids are the keys used by js/scramble.js.
     readonly property var events: [
-        { id: "333",    name: "3x3" },
-        { id: "222",    name: "2x2" },
-        { id: "444",    name: "4x4" },
-        { id: "555",    name: "5x5" },
-        { id: "666",    name: "6x6" },
-        { id: "777",    name: "7x7" },
-        { id: "333oh",  name: "3x3 OH" },
-        { id: "333bld", name: "3x3 BLD" },
+        { id: "333",    name: "3\u00d73\u00d73" },
+        { id: "222",    name: "2\u00d72\u00d72" },
+        { id: "444",    name: "4\u00d74\u00d74" },
+        { id: "555",    name: "5\u00d75\u00d75" },
+        { id: "666",    name: "6\u00d76\u00d76" },
+        { id: "777",    name: "7\u00d77\u00d77" },
+        { id: "333oh",  name: "3\u00d73\u00d73 OH" },
+        { id: "333bld", name: "3\u00d73\u00d73 BLD" },
         { id: "pyram",  name: "Pyraminx" },
         { id: "skewb",  name: "Skewb" },
         { id: "minx",   name: "Megaminx" },
