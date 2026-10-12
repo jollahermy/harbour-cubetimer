@@ -1643,17 +1643,20 @@ Page {
                                     }
                                 }
                                 // Focus lost (tap outside): leave rename mode without saving.
-                                onActiveFocusChanged: {
-                                    if (!activeFocus && menuRow.isRenaming) page.cancelRename();
+                                // Deferred: changing renamingId synchronously here re-enters the
+                                // isRenaming binding (binding loop) and can cancel a rename that
+                                // is just starting while focus settles.
+                                onActiveFocusChanged: if (!activeFocus) renameBlurTimer.restart()
+                                Timer {
+                                    id: renameBlurTimer
+                                    interval: 50
+                                    onTriggered: {
+                                        if (menuRow.isRenaming && !renameField.activeFocus) page.cancelRename();
+                                    }
                                 }
                             }
                         }
 
-                        // Top layer: the swipe/tap area. It receives every press on the row.
-                        //   swipe left (locked horizontal)  -> reveal Rename / Delete
-                        //   tap on an open row's buttons    -> Rename (left) / Delete (right)
-                        //   tap on a closed row             -> switch to that session, close menu
-                        //   tap elsewhere while a row is open -> close that row
                         // Top layer: the swipe / tap / long-press area. It receives every press on the row.
                         //   swipe left (locked horizontal)   -> reveal Delete
                         //   tap on the revealed Delete       -> delete the session
