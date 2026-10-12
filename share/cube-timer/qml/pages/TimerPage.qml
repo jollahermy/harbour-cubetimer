@@ -1010,7 +1010,6 @@ Page {
 
                 // Name and "+" as one group, centred on the row; "+" sits right next to the name.
                 Item {
-                    id: sessionGroup
                     anchors.fill: parent
 
                     BackgroundItem {
@@ -1042,7 +1041,6 @@ Page {
                         opacity: addSessionArea.enabled ? 1 : 0.4
 
                         Rectangle {
-                            id: addCircle
                             anchors.fill: parent
                             radius: width / 2
                             color: "transparent"
@@ -1130,7 +1128,6 @@ Page {
                 width: parent.width
                 height: scrambleBox.height
                 Item {
-                    id: maskBand
                     width: parent.width
                     height: wipeMask.bandH
                     y: scrambleBox.height
@@ -1278,7 +1275,6 @@ Page {
 
             // Collapsed values: latest solve and the three averages (right-aligned).
             Column {
-                id: statsValues
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 width: page.statsValueW
@@ -1409,7 +1405,6 @@ Page {
 
         // Penalty line under the big time: DNF raw time or +2 total.
         Label {
-            id: subLabel
             anchors.top: timeLabel.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             width: page.width - 2 * Theme.paddingMedium
@@ -1445,7 +1440,6 @@ Page {
             }
 
             Rectangle {
-                id: eventMenuBox
                 anchors.top: parent.top
                 anchors.topMargin: Theme.paddingSmall
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -1629,7 +1623,6 @@ Page {
                             }
 
                             Label {
-                                id: menuRowLabel
                                 anchors.centerIn: parent
                                 width: parent.width - 2 * Theme.paddingLarge
                                 horizontalAlignment: Text.AlignHCenter
@@ -1856,7 +1849,6 @@ Page {
                     }
                     // Long press copies; the popup stays open. Presses here never reach the card/dim.
                     MouseArea {
-                        id: popupScrambleTouch
                         anchors.fill: parent
                         property real pressX: 0
                         property real pressY: 0
