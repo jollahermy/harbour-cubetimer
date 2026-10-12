@@ -12,11 +12,6 @@ import "../components"
 Page {
     id: page
 
-    // Look switch. true = native Sailfish style: the ambience shows through, colours come from
-    // Theme, lists and the popup use a Theme surface, the scramble wipe is a transparency mask.
-    // false = the fixed plum palette below, an opaque background and the colour veil wipe.
-    property bool systemStyle: true
-
     // ---- font: Nunito (SIL OFL 1.1), bundled static TTFs (see fonts/OFL.txt) ----
     // Keep the display on for the whole solve (hold + run); normal blanking otherwise.
     DisplayBlanking { preventBlanking: page.phase === "holding" || page.phase === "running" }
@@ -111,19 +106,18 @@ Page {
     property real tablePressY: 0
     // Scramble and stats: full when idle, dimmed while holding (armed), hidden while running.
     readonly property real idleOpacity: phase === "idle" ? 1 : (phase === "holding" ? 0.3 : 0)
-    // Scramble: full while idle, dimmed while holding. On start a soft veil (scrambleVeil)
-    // rises over it from the bottom edge; when the veil has passed, the scramble is hidden.
-    // Both are reset on stop.
+    // Scramble: full while idle, dimmed while holding. On start a wipe (wipeMask) moves up
+    // from the bottom edge; when it has passed, the scramble is hidden. Both are reset on stop.
     // True only during the solve-stop transition: scramble and stats switch back instantly
-    // (no fade-in) while the veil still covers them, so nothing flashes.
+    // (no fade-in) while the wipe still covers them, so nothing flashes.
     property bool noFade: false
     // Scramble visibility is ONE explicit state, set by setScrambleMode() in a single step
     // (no binding, so no intermediate value between holding / running / idle):
-    //   normal = opacity 1 (idle) | dim = 0.3 (holding) | sweep = 0.3 + veil rising
-    //   hidden = opacity 0, veil gone (running, after the sweep) | back to normal on stop.
+    //   normal = opacity 1 (idle) | dim = 0.3 (holding) | sweep = 0.3 + wipe moving
+    //   hidden = opacity 0, wipe finished (running, after the sweep) | back to normal on stop.
     property string scrambleMode: "normal"
-    // Dim/hide goes on the scramble TEXT, not on scrambleBox: the veil is a child of scrambleBox,
-    // so an opacity on the box would also fade the veil and make the wipe invisible.
+    // Dim/hide goes on the scramble TEXT, not on scrambleBox: the wipe mask is a child of
+    // scrambleBox and an opacity there would change the mask as well.
     // Top controls (event row + session row): ONE state, set in one place.
     //   normal = 1 (idle, after stop/cancel) | dim = 0.3 (holding) | hidden = 0 (running)
     // Opacity only (no layout change). Clicks are already blocked by phase (MouseAreas/BackgroundItems).
@@ -136,11 +130,10 @@ Page {
     function setScrambleMode(m) {
         scrambleMode = m;
         scrambleText.opacity = (m === "normal") ? 1 : (m === "hidden" ? 0 : 0.3);
-        scrambleVeil.visible = (m === "sweep") && !page.systemStyle;
     }
     NumberAnimation {
-        id: veilWipe
-        target: scrambleVeil.shift
+        id: wipeAnim
+        target: wipeShift
         property: "y"
         duration: 180
         easing.type: Easing.OutCubic
@@ -172,24 +165,17 @@ Page {
 
     readonly property int readyDelayMs: 550          // hold time before green
     readonly property int cooldownMs: 300            // ignore touches after stop
-    // Fixed palette (independent of the system theme). Calm dark plum-slate, soft pastel accent.
+    // Hold feedback colours (red = not ready, green = ready) are fixed; everything else is Theme.
     readonly property color notReadyColor: "#ff7b84"
     readonly property color readyColor: "#6fdc9a"
-    readonly property color dimColor: systemStyle ? Theme.secondaryColor : "#bfaebf"
-    readonly property color accentColor: systemStyle ? Theme.highlightColor : "#ff9db8"     // interactive: pressed, current item, '+', copy flash
-    readonly property color lavenderColor: systemStyle ? Theme.secondaryColor : "#d8c3d6"   // secondary text: session name, labels, arrows
-    readonly property color textColor: systemStyle ? Theme.primaryColor : "#f8f0f5"         // primary text: event title, times, list names
-    // Page background: none in the system style (the ambience shows); plum-slate otherwise.
-    // Page, scramble veil and everything that must match use it.
-    readonly property color bgColor: systemStyle ? "transparent" : "#38303a"
+    readonly property color dimColor: Theme.secondaryColor
+    readonly property color accentColor: Theme.highlightColor       // pressed, current item, '+', copy flash
+    readonly property color lavenderColor: Theme.secondaryColor     // secondary text: session name, labels, arrows
+    readonly property color textColor: Theme.primaryColor           // primary text: event title, times, list names
     // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
-    // System style: Theme's dimmer surface (like Silica dialogs), slightly see-through.
-    readonly property color panelColor: systemStyle ? Theme.rgba(Theme.highlightDimmerColor, 0.9) : "#463b47"
-    // Press feedback fill (rows, '+' circle, event name). System style: Silica's pressed
-    // background; otherwise the accent at 25 %.
-    readonly property color pressFill: systemStyle
-        ? Theme.rgba(palette.highlightBackgroundColor, Theme.highlightBackgroundOpacity)
-        : Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.25)
+    readonly property color panelColor: Theme.rgba(Theme.highlightDimmerColor, 0.9)
+    // Press feedback fill (rows, '+' circle, event name): Silica's pressed background.
+    readonly property color pressFill: Theme.rgba(palette.highlightBackgroundColor, Theme.highlightBackgroundOpacity)
     // One corner radius for every raised card: solve popup and both drop-down lists.
     readonly property real cornerRadius: Theme.paddingMedium
 
@@ -631,9 +617,9 @@ Page {
         setTopMode("normal");
         phase = "idle";
         ready = false;
-        setScrambleMode("normal");                   // before veilWipe.stop(): onStopped only acts in "sweep"
-        veilWipe.stop();
-        veilShift.y = 0;
+        setScrambleMode("normal");                   // before wipeAnim.stop(): onStopped only acts in "sweep"
+        wipeAnim.stop();
+        wipeShift.y = 0;
         eventIndex = i;
         prevScramble = "";                            // history is per event
         fwdScramble = "";
@@ -696,11 +682,11 @@ Page {
 
     function startSolve() {
         holdTimer.stop();
-        setScrambleMode("sweep");                      // dimmed scramble stays; veil rises over it
+        setScrambleMode("sweep");                      // dimmed scramble stays; the wipe moves over it
         setTopMode("hidden");
         phase = "running";
-        veilWipe.to = -(scrambleBox.height + scrambleVeil.bandH);
-        veilWipe.start();
+        wipeAnim.to = -(scrambleBox.height + wipeMask.bandH);
+        wipeAnim.start();
         ready = false;
         startMs = Date.now();
         timeText = "0.00";
@@ -712,10 +698,10 @@ Page {
     function stopSolve(now) {
         runTimer.stop();
         noFade = true;                                 // no fade-in of scramble/stats on stop
-        setScrambleMode("normal");                     // scramble back at once (before veilWipe.stop)
+        setScrambleMode("normal");                     // scramble back at once (before wipeAnim.stop)
         setTopMode("normal");
-        veilWipe.stop();
-        veilShift.y = 0;
+        wipeAnim.stop();
+        wipeShift.y = 0;
         var s = { time_ms: now - startMs, penalty: { plus2Count: 0, dnf: false },
                   event: currentEvent.id, scramble: scramble };
         lastStopMs = now;
@@ -840,9 +826,6 @@ Page {
         onTriggered: page.timeText = page.fmt(Date.now() - page.startMs)
     }
 
-    // Page-level background: covers flickable overshoot so it never shows the theme colour.
-    Rectangle { anchors.fill: parent; color: page.bgColor }
-
     SilicaFlickable {
         id: flick
         anchors.fill: parent
@@ -946,12 +929,6 @@ Page {
             }
             opacity: page.phase === "holding" ? 1 : 0
             Behavior on opacity { FadeAnimation { duration: 120 } }
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            color: page.bgColor
-            z: -1
         }
 
         // Top area. Row 1: event selector, centred. Row 2: session name centred
@@ -1122,9 +1099,8 @@ Page {
                 width: parent.width
                 height: scrambleBox.height
                 clip: true
-                // System style: the start wipe is a transparency mask (wipeMask) on this layer.
-                // Layer only while sweeping; the veil path is used otherwise.
-                layer.enabled: page.systemStyle && page.scrambleMode === "sweep"
+                // Start wipe: the transparency mask wipeMask, applied only while sweeping.
+                layer.enabled: page.scrambleMode === "sweep"
                 layer.effect: OpacityMask { maskSource: wipeMask }
 
             ScrambleGrid {
@@ -1141,13 +1117,14 @@ Page {
             }
             }
 
-            // System-style wipe mask (used by scrambleWipe's OpacityMask, never drawn itself).
-            // Opaque above a soft band, the band fades from opaque (top) to transparent (bottom),
-            // transparent below. Its position is the veil's (veilShift.y, same 180 ms OutCubic
-            // move): starts with the band just under the box (all visible), moves up by
-            // (box height + band) so the transparent part eats the scramble from the bottom up.
+            // Start-wipe mask (used by scrambleWipe's OpacityMask, never drawn itself). Opaque
+            // above a soft band; the band fades from opaque (top) to transparent (bottom), and
+            // everything below it is transparent. The band starts just under the box (all
+            // visible) and moves up by (box height + band) over 180 ms (wipeShift, OutCubic), so
+            // the transparent part eats the scramble from the bottom up.
             Item {
                 id: wipeMask
+                readonly property real bandH: 120
                 visible: false
                 anchors.top: parent.top
                 width: parent.width
@@ -1155,9 +1132,9 @@ Page {
                 Item {
                     id: maskBand
                     width: parent.width
-                    height: scrambleVeil.bandH
+                    height: wipeMask.bandH
                     y: scrambleBox.height
-                    transform: Translate { y: veilShift.y }
+                    transform: Translate { id: wipeShift; y: 0 }
                     Rectangle {                          // solid part above the band
                         width: parent.width
                         height: page.height
@@ -1171,34 +1148,6 @@ Page {
                             GradientStop { position: 1; color: "#00ffffff" }
                         }
                     }
-                }
-            }
-
-            // Soft wipe veil: page-coloured, its top edge a fading band (same look as the hold
-            // highlight). Rests just below the scramble (clipped away). Start: moves up by
-            // (scramble height + band) so the solid part covers the scramble from the bottom up.
-            Item {
-                id: scrambleVeil
-                readonly property real bandH: 120
-                visible: false
-                property alias shift: veilShift
-                width: scrambleBox.width
-                height: bandH + scrambleBox.height
-                y: scrambleBox.height
-                transform: Translate { id: veilShift; y: 0 }
-                Rectangle {
-                    width: parent.width
-                    height: scrambleVeil.bandH
-                    gradient: Gradient {
-                        GradientStop { position: 0; color: Qt.rgba(page.bgColor.r, page.bgColor.g, page.bgColor.b, 0) }
-                        GradientStop { position: 1; color: page.bgColor }
-                    }
-                }
-                Rectangle {
-                    y: scrambleVeil.bandH
-                    width: parent.width
-                    height: parent.height - scrambleVeil.bandH
-                    color: page.bgColor
                 }
             }
 
@@ -1283,10 +1232,9 @@ Page {
         Text { id: eventNameProbe;   visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: page.widestName(page.events) }
         Text { id: sessionNameProbe; visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: page.widestName(page.sessionMenuItems) }
 
-        // System style only: a faint dimmer under the bottom stats so the small numbers stay
-        // readable on bright ambiences. Fades in from nothing at its top edge; follows the stats.
+        // A faint dimmer under the bottom stats so the small numbers stay readable on bright
+        // ambiences. Fades in from nothing at its top edge; follows the stats.
         Rectangle {
-            visible: page.systemStyle
             z: 1
             anchors.left: parent.left
             anchors.right: parent.right
