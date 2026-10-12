@@ -1023,10 +1023,12 @@ Page {
                     id: eventText
                     anchors.centerIn: parent
                     text: page.currentEvent.name
+                    // Main title: bold, primary colour; accent while pressed; dimmed while a solve runs.
                     color: page.phase === "idle"
-                           ? (eventArea.pressed ? Theme.secondaryHighlightColor : Theme.highlightColor)
+                           ? (eventArea.pressed ? Theme.highlightColor : Theme.primaryColor)
                            : Theme.secondaryColor
                     font.pixelSize: Theme.fontSizeExtraLarge
+                    font.bold: true
                 }
 
                 // Down arrow attached to the right of the name, same gap as the session "+".
@@ -1036,7 +1038,7 @@ Page {
                     anchors.leftMargin: Theme.paddingLarge
                     anchors.verticalCenter: parent.verticalCenter
                     text: "\u25BE"
-                    color: eventText.color
+                    color: Theme.secondaryColor
                     font.pixelSize: Theme.fontSizeExtraLarge
                 }
 
@@ -1075,7 +1077,10 @@ Page {
                             id: sessionLabel
                             anchors.centerIn: parent
                             text: page.sessionName
-                            color: sessionButton.enabled ? Theme.secondaryHighlightColor : Theme.secondaryColor
+                            // Accent when idle; primary while pressed; dimmed while a solve runs.
+                            color: sessionButton.enabled
+                                   ? (sessionButton.down ? Theme.primaryColor : Theme.highlightColor)
+                                   : Theme.secondaryColor
                             font.pixelSize: Theme.fontSizeLarge
                         }
                     }
