@@ -1531,8 +1531,12 @@ Page {
                             anchors.bottom: parent.bottom
                             width: menuRow.actionW
 
+                            // Rounded pill inset inside the row, so its corners never poke out of the
+                            // drop-down's rounded corners (clip only clips the bounding box).
                             Rectangle {
                                 anchors.fill: parent
+                                anchors.margins: Theme.paddingSmall
+                                radius: Math.max(0, page.cornerRadius - Theme.paddingSmall)
                                 color: "#a8465a"
                                 // Visual only: the row's HSwipeArea (above) decides taps by x position.
                                 IconButton {
