@@ -3,6 +3,7 @@ import Sailfish.Silica 1.0
 import QtQuick.LocalStorage 2.0 as Sql
 import "../js/scramble.js" as Scramble
 import "../js/stats.js" as Stats
+import "../js/scrambleLayout.js" as Layout
 import "../components"
 
 Page {
@@ -135,19 +136,9 @@ Page {
     // ---- copy scramble (long press on the scramble, main page or popup) ----
     readonly property int copyHoldMs: 700
     property bool copyFlash: false                   // scramble text shows the highlight colour
-    // Plain scramble text: single spaces between tokens, no grid padding, rows joined with '\n'.
-    function plainScramble(text) {
-        var rows = String(text).split("\n");
-        var out = [];
-        for (var i = 0; i < rows.length; i++) {
-            var toks = rows[i].split(/\s+/).filter(function (t) { return t.length > 0; });
-            if (toks.length) out.push(toks.join(" "));
-        }
-        return out.join("\n");
-    }
     function copyScramble(text) {
         if (!text || text === "(no scramble saved)") return;
-        Clipboard.text = plainScramble(text);
+        Clipboard.text = Layout.plainText(text);
         copyFlash = true;
         copyFlashTimer.restart();
         copyNotice.opacity = 1;
@@ -210,92 +201,10 @@ Page {
         return Math.min(maxTimeSize, Math.max(minTimeSize, v));
     }
 
-    // ---- scramble layout: cells (no monospace font) --------------------
-    // Every move token sits in its own fixed-width cell. The cell width is the widest token
-    // measured in Nunito (probes at 100 px, scaled linearly), so columns line up. The gap between
-    // cells is 0.5 em; tokens themselves get no letter spacing.
+    // ---- scramble layout (renderer: components/ScrambleGrid.qml) --------
     readonly property real scrambleSideMargin: (currentEvent.id === "minx") ? Theme.paddingSmall : Theme.paddingMedium
     readonly property real scrambleMaxHeight: page.height * ((currentEvent.id === "minx") ? 0.38 : 0.35)
     readonly property real scrambleWidth: page.width - 2 * scrambleSideMargin
-
-    // Split into rows of tokens (never empty rows).
-    function parseScramble(text) {
-        var srcLines = String(text).split("\n");
-        var lines = [];
-        var maxTok = 1;
-        for (var i = 0; i < srcLines.length; i++) {
-            var toks = srcLines[i].split(/\s+/).filter(function (t) { return t.length > 0; });
-            lines.push(toks);
-            maxTok = Math.max(maxTok, toks.length);
-        }
-        return { lines: lines, maxTok: maxTok };
-    }
-    readonly property var scrambleLines: parseScramble(scramble).lines
-    readonly property var scrambleTokens: {
-        var all = [];
-        for (var i = 0; i < scrambleLines.length; i++)
-            for (var j = 0; j < scrambleLines[i].length; j++) all.push(scrambleLines[i][j]);
-        return all;
-    }
-    // Probes at 100 px: one per token (widest token -> cell width), and one line for the line height.
-    Repeater {
-        id: tokProbe
-        model: page.scrambleTokens
-        Text { visible: false; font.family: page.appFont; font.pixelSize: 100; text: modelData }
-    }
-    Text { id: lineProbe; visible: false; font.family: page.appFont; font.pixelSize: 100; text: "Ag" }
-    readonly property real tokW100: {
-        var m = 0;
-        for (var i = 0; i < tokProbe.count; i++) m = Math.max(m, tokProbe.itemAt(i).implicitWidth);
-        return m;
-    }
-    readonly property real lineH100: lineProbe.implicitHeight
-
-    // Cell layout at a pixel size. Generic events wrap rows to the width; megaminx (noWrap)
-    // keeps each WCA line in one row. Returns the rows plus the block size.
-    function layoutAt(px, noWrap) {
-        var cw = tokW100 * px / 100 * 1.04;               // 4 % headroom for hinted advances
-        var gap = px * 0.5;
-        var lh = lineH100 * px / 100;
-        var cols = noWrap ? Math.max(1, parseScramble(scramble).maxTok)
-                          : Math.max(1, Math.floor((scrambleWidth + gap) / (cw + gap)));
-        var rows = [];
-        var widest = 0;
-        for (var r = 0; r < scrambleLines.length; r++) {
-            var row = scrambleLines[r];
-            for (var c = 0; c < row.length; c += cols) {
-                var chunk = row.slice(c, c + cols);
-                rows.push(chunk);
-                widest = Math.max(widest, chunk.length * cw + (chunk.length - 1) * gap);
-            }
-        }
-        return { rows: rows, size: px, cw: cw, gap: gap, lh: lh,
-                 width: Math.min(widest, scrambleWidth), widest: widest, height: rows.length * lh };
-    }
-    // Generic: largest of [Large, Medium, Small, ExtraSmall] whose block fits width and height.
-    function fitScrambleGeneric() {
-        var sizes = [Theme.fontSizeLarge, Theme.fontSizeMedium, Theme.fontSizeSmall, Theme.fontSizeExtraSmall];
-        var best = null;
-        for (var k = 0; k < sizes.length; k++) {
-            best = layoutAt(sizes[k], false);
-            if (best.height <= scrambleMaxHeight && best.widest <= scrambleWidth + 0.5) break;
-        }
-        return best;
-    }
-    // Megaminx: 7 WCA lines, one row each, never wrapped; largest integer px that fits.
-    function fitMegaminx() {
-        if (tokW100 <= 0 || lineH100 <= 0) return null;
-        var w100 = layoutAt(100, true).widest;
-        var pxW = Math.floor(scrambleWidth * 100 / Math.max(1, w100));
-        var pxH = Math.floor(scrambleMaxHeight * 100 / Math.max(1, layoutAt(100, true).height));
-        var px = Math.min(pxW, pxH);
-        if (px < 8) return null;
-        return layoutAt(px, true);
-    }
-    // Megaminx uses the 7-row layout; every other event uses the generic fit.
-    readonly property var scrambleFit: (page.currentEvent.id === "minx")
-        ? (fitMegaminx() || fitScrambleGeneric())
-        : fitScrambleGeneric()
 
     // Penalty line under the time: about 40% of the time size, at least fontSizeLarge.
     readonly property real penaltySize: Math.max(Theme.fontSizeLarge, timeSize * 0.4)
@@ -1176,7 +1085,7 @@ Page {
             anchors.right: parent.right
             anchors.leftMargin: page.scrambleSideMargin
             anchors.rightMargin: page.scrambleSideMargin
-            height: page.scrambleFit.height
+            height: scrambleText.height
             clip: true
             // Dimmed while holding; the start wipe below removes it. Layout stays fixed.
             opacity: 1                       // box stays opaque; text dims via setScrambleMode()
@@ -1190,36 +1099,17 @@ Page {
                 height: scrambleBox.height
                 clip: true
 
-            Item {
+            ScrambleGrid {
                 id: scrambleText
                 anchors.top: parent.top
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: page.scrambleFit.width
-                height: page.scrambleFit.height
+                text: page.scramble
+                eventId: page.currentEvent.id
+                maxWidth: page.scrambleWidth
+                maxHeight: page.scrambleMaxHeight
+                fontFamily: page.appFont
+                ink: page.copyFlash ? page.accentColor : page.dimColor
                 transform: Translate { id: scrambleShift; x: 0 }
-                Column {
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    Repeater {
-                        model: page.scrambleFit.rows
-                        Row {
-                            spacing: page.scrambleFit.gap
-                            Repeater {
-                                model: modelData
-                                Text {
-                                    width: page.scrambleFit.cw
-                                    height: page.scrambleFit.lh
-                                    text: modelData
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    font.family: page.appFont
-                                    font.pixelSize: page.scrambleFit.size
-                                    color: page.copyFlash ? page.accentColor : page.dimColor
-                                }
-                            }
-                        }
-                    }
-                }
             }
             }
 
@@ -1686,12 +1576,17 @@ Page {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
-                                anchors.leftMargin: Theme.paddingLarge
-                                anchors.rightMargin: Theme.paddingLarge
                                 visible: menuRow.isRenaming
                                 enabled: menuRow.isRenaming
+                                // Same look as the row names: centred, app font, primary colour.
+                                // No Silica label (it would reserve space above the text).
+                                labelVisible: false
+                                horizontalAlignment: TextInput.AlignHCenter
+                                textLeftMargin: Theme.paddingSmall
+                                textRightMargin: Theme.paddingSmall
+                                color: page.textColor
                                 text: modelData.name
-                                font.pixelSize: Theme.fontSizeMedium; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeMedium) * page.trackK
+                                font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK
                                 EnterKey.onClicked: {
                                     page.confirmRename(menuRow.rowId, text);
                                     focus = false;
@@ -1848,15 +1743,20 @@ Page {
                     }
                 }
                 Item { width: 1; height: Theme.paddingMedium }
-                Label {
+                Item {
                     id: popupScramble
                     width: parent.width
-                    text: page.scrambleOf(page.popupSolve)
-                    color: page.copyFlash ? page.accentColor : page.textColor
-                    wrapMode: Text.WordWrap
-                    font.pixelSize: (page.scrambleOf(page.popupSolve).length > 120) ? Theme.fontSizeExtraSmall : Theme.fontSizeSmall; font.family: page.appFont; font.letterSpacing: ((page.scrambleOf(page.popupSolve).length > 120) ? Theme.fontSizeExtraSmall : Theme.fontSizeSmall) * page.trackK
-                    horizontalAlignment: Text.AlignHCenter
-
+                    height: popupGrid.height
+                    ScrambleGrid {
+                        id: popupGrid
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: page.scrambleOf(page.popupSolve)
+                        eventId: page.popupSolve ? page.popupSolve.event : ""
+                        maxWidth: cardCol.width
+                        maxHeight: page.height * 0.3
+                        fontFamily: page.appFont
+                        ink: page.copyFlash ? page.accentColor : page.textColor
+                    }
                     // Long press copies; the popup stays open. Presses here never reach the card/dim.
                     MouseArea {
                         id: popupScrambleTouch
