@@ -110,8 +110,11 @@ Page {
     // Top controls (event row + session row): ONE state, set in one place.
     //   normal = 1 (idle, after stop/cancel) | dim = 0.3 (holding) | hidden = 0 (running)
     // Opacity only (no layout change). Clicks are already blocked by phase (MouseAreas/BackgroundItems).
+    // The event row (name + arrow) stays readable: 1 idle, 0.5 holding, 0.4 running.
+    // The session row keeps its own rule: 1 idle, 0.3 holding, hidden while running.
     function setTopMode(m) {
-        topRow.opacity = (m === "normal") ? 1 : (m === "dim" ? 0.3 : 0);
+        sessionRowItem.opacity = (m === "normal") ? 1 : (m === "dim" ? 0.3 : 0);
+        eventButton.opacity = (m === "normal") ? 1 : (m === "dim" ? 0.5 : 0.4);
     }
     function setScrambleMode(m) {
         scrambleMode = m;
@@ -1034,8 +1037,6 @@ Page {
             anchors.left: parent.left
             anchors.right: parent.right
             height: eventButton.height + sessionRowItem.height
-            opacity: 1
-            Behavior on opacity { NumberAnimation { duration: 150 } }
 
             Item {
                 id: eventButton
@@ -1043,6 +1044,8 @@ Page {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: eventText.implicitHeight + Theme.paddingSmall
+                opacity: 1
+                Behavior on opacity { NumberAnimation { duration: 150 } }
                 // Half-width of name + arrow, measured from the page centre (the name is centred).
                 // Highlight and tap area use this same width, so both cover the arrow and the
                 // padding is even around the name.
@@ -1099,6 +1102,8 @@ Page {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: sessionLabel.implicitHeight + Theme.paddingSmall
+                opacity: 1
+                Behavior on opacity { NumberAnimation { duration: 150 } }
 
                 // Name and "+" as one group, centred on the row; "+" sits right next to the name.
                 Item {
