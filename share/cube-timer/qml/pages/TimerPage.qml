@@ -1454,18 +1454,21 @@ Page {
                     VerticalScrollDecorator { flickable: eventList }
 
                     delegate: BackgroundItem {
+                        id: eventDelegate
                         width: eventList.width
                         height: Theme.itemSizeSmall
                         // Press tint: inset rounded rect (same as the session rows), so it never pokes
                         // out of the list's rounded corners. The default full-row highlight is off.
                         highlightedColor: "transparent"
                         onClicked: page.pickEvent(index)
+                        // Children of a BackgroundItem are reparented into its contentItem, so
+                        // `parent` is not the delegate: read `down` through the id.
                         Rectangle {
                             anchors.fill: parent
                             anchors.margins: Theme.paddingSmall
                             radius: Math.max(0, page.cornerRadius - Theme.paddingSmall)
                             color: page.accentColor
-                            opacity: parent.down ? 0.25 : 0
+                            opacity: eventDelegate.down ? 0.25 : 0
                         }
 
                         Label {
