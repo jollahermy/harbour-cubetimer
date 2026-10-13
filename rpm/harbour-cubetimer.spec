@@ -54,12 +54,12 @@ for s in 86x86 108x108 128x128 172x172 256x256; do
         %{buildroot}%{_datadir}/icons/hicolor/$s/apps/harbour-cubetimer.png
 done
 
-# licence
-install -D -m 0644 $APP/LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
+# licence: inside the app's share dir, the only location besides bin/, desktop and icons that the
+# Harbour validator allows (/usr/share/licenses and %doc paths are rejected as 'not allowed')
+install -D -m 0644 $APP/LICENSE %{buildroot}%{_datadir}/harbour-cubetimer/LICENSE
 
 %files
 %defattr(-,root,root,-)
-%license %{_datadir}/licenses/%{name}/LICENSE
 %{_bindir}/harbour-cubetimer
 %{_datadir}/harbour-cubetimer
 %{_datadir}/applications/harbour-cubetimer.desktop
