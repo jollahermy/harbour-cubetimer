@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Cube Timer
+Comment=Rubik's cube speedsolving timer
+Icon=harbour-cubetimer
+Exec=harbour-cubetimer
+X-Nemo-Application-Type=silica-qt5
+
+[X-Sailjail]
+OrganizationName=org.bfs87
+ApplicationName=harbour-cubetimer
+Permissions=
