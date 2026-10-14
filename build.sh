@@ -6,7 +6,7 @@ cd "$(dirname "$0")/src"
 export PATH=$S/usr/bin:$PATH LD_LIBRARY_PATH=$S/usr/lib64:/usr/lib64
 INC="-I$S/usr/include/sailfishapp -I$S/usr/include/qt5 -I$S/usr/include/qt5/QtCore -I$S/usr/include/qt5/QtGui -I$S/usr/include/qt5/QtQml -I$S/usr/include/qt5/QtQuick"
 OBJ=""
-for f in main.cpp nativescrambler.cpp scramble/rng.cpp scramble/scramble.cpp; do
+for f in main.cpp nativescrambler.cpp $(ls scramble/*.cpp | grep -v cli.cpp); do
   o="../build/$(echo $f | tr / _ | sed 's/\.cpp$/.o/')"
   mkdir -p ../build
   g++ --sysroot=$S -B$S/usr/bin/ -std=gnu++11 -O2 -fPIC -pthread $INC -c $f -o $o
