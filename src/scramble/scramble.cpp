@@ -33,15 +33,13 @@ std::string Scrambler::mega(const std::vector<std::vector<std::string>> &turns,
 std::string Scrambler::cubeBig(int n, int length)
 {
     // megascramble.js args "555wca" / "666wca" / "777wca"
-    std::vector<std::vector<std::string>> t;
-    if (n == 5)
-        t = { { "U", "D", "Uw", "Dw" }, { "R", "L", "Rw", "Lw" }, { "F", "B", "Fw", "Bw" } };
-    else if (n == 6)
-        t = { { "U", "D", "Uw", "Dw", "3Uw" }, { "R", "L", "Rw", "Lw", "3Rw" }, { "F", "B", "Fw", "Bw", "3Fw" } };
-    else
-        t = { { "U", "D", "Uw", "Dw", "3Uw", "3Dw" }, { "R", "L", "Rw", "Lw", "3Rw", "3Lw" },
-              { "F", "B", "Fw", "Bw", "3Fw", "3Bw" } };
-    return mega(t, kCubeSuff, length);
+    using Turns = std::vector<std::vector<std::string>>;
+    static const Turns k5 = { { "U", "D", "Uw", "Dw" }, { "R", "L", "Rw", "Lw" }, { "F", "B", "Fw", "Bw" } };
+    static const Turns k6 = { { "U", "D", "Uw", "Dw", "3Uw" }, { "R", "L", "Rw", "Lw", "3Rw" },
+                              { "F", "B", "Fw", "Bw", "3Fw" } };
+    static const Turns k7 = { { "U", "D", "Uw", "Dw", "3Uw", "3Dw" }, { "R", "L", "Rw", "Lw", "3Rw", "3Lw" },
+                              { "F", "B", "Fw", "Bw", "3Fw", "3Bw" } };
+    return mega(n == 5 ? k5 : n == 6 ? k6 : k7, kCubeSuff, length);
 }
 
 std::string Scrambler::clockWca()
@@ -127,9 +125,10 @@ std::string Scrambler::generate(const std::string &e)
     else if (e == "minx") s = megaminxPochmann(70);
     else if (e == "555bld") {
         // '${["555wca",60]}#{[[""]],[...3Rw...],1}#{[[""]],[...3Uw...],1}'
-        s = cubeBig(5, 60);
-        s += mega({ { "" } }, { "", " 3Rw", " 3Rw2", " 3Rw'", " 3Fw", " 3Fw'" }, 1);
-        s += mega({ { "" } }, { "", " 3Uw", " 3Uw2", " 3Uw'" }, 1);
+        static const std::vector<std::vector<std::string>> kNone = { { "" } };
+        static const std::vector<std::string> kRotX = { "", " 3Rw", " 3Rw2", " 3Rw'", " 3Fw", " 3Fw'" };
+        static const std::vector<std::string> kRotY = { "", " 3Uw", " 3Uw2", " 3Uw'" };
+        s = cubeBig(5, 60) + mega(kNone, kRotX, 1) + mega(kNone, kRotY, 1);
     } else if (gen333Supported(e)) s = gen333(rng_, e);
     else if (gen222Supported(e)) s = gen222(rng_, e);
     else if (genPyrSupported(e)) s = genPyr(rng_, e);
