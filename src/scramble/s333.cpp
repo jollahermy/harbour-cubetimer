@@ -1024,6 +1024,79 @@ std::string anyScramble(Rng &rng, int firstAxisFilter, int lastAxisFilter)
 
 } // namespace
 
+// min2phase CubieCube.fromFacelet + Search.verify + solution(facelet, 21, 1e9, 50, 0): used by the
+// 4x4 scrambler (scramble_333.solvFacelet) for its final 3x3 stage.
+std::string solveFacelet333(const std::string &facelet)
+{
+    static const int cornerFacelet[8][3] = { { 8, 9, 20 }, { 6, 18, 38 }, { 0, 36, 47 }, { 2, 45, 11 },
+                                             { 29, 26, 15 }, { 27, 44, 24 }, { 33, 53, 42 }, { 35, 17, 51 } };
+    static const int edgeFacelet[12][2] = { { 5, 10 }, { 7, 19 }, { 3, 37 }, { 1, 46 }, { 32, 16 }, { 28, 25 },
+                                            { 30, 43 }, { 34, 52 }, { 23, 12 }, { 21, 41 }, { 50, 39 }, { 48, 14 } };
+    if (facelet.size() < 54)
+        return "Error 1";
+    const std::string centers = { facelet[4], facelet[13], facelet[22], facelet[31], facelet[40], facelet[49] };
+    array<int, 54> f {};
+    int count = 0;
+    for (int i = 0; i < 54; ++i) {
+        const size_t c = centers.find(facelet[i]);
+        if (c == std::string::npos)
+            return "Error 1";
+        f[i] = static_cast<int>(c);
+        count += 1 << (f[i] << 2);
+    }
+    if (count != 0x999999)
+        return "Error 1";
+    Cubie cc;
+    for (int i = 0; i < 8; ++i) {
+        int ori;
+        for (ori = 0; ori < 3; ++ori)
+            if (f[cornerFacelet[i][ori]] == 0 || f[cornerFacelet[i][ori]] == 3)
+                break;
+        const int col1 = f[cornerFacelet[i][(ori + 1) % 3]];
+        const int col2 = f[cornerFacelet[i][(ori + 2) % 3]];
+        for (int j = 0; j < 8; ++j)
+            if (col1 == cornerFacelet[j][1] / 9 && col2 == cornerFacelet[j][2] / 9) {
+                cc.ca[i] = j | (ori % 3) << 4;
+                break;
+            }
+    }
+    for (int i = 0; i < 12; ++i)
+        for (int j = 0; j < 12; ++j) {
+            if (f[edgeFacelet[i][0]] == edgeFacelet[j][0] / 9 && f[edgeFacelet[i][1]] == edgeFacelet[j][1] / 9) {
+                cc.ea[i] = j;
+                break;
+            }
+            if (f[edgeFacelet[i][0]] == edgeFacelet[j][1] / 9 && f[edgeFacelet[i][1]] == edgeFacelet[j][0] / 9) {
+                cc.ea[i] = j | 0x10;
+                break;
+            }
+        }
+    // verify()
+    int sum = 0, edgeMask = 0;
+    for (int e = 0; e < 12; e++) {
+        edgeMask |= 1 << (cc.ea[e] & 0xf);
+        sum ^= cc.ea[e] >> 4;
+    }
+    if (edgeMask != 0xfff)
+        return "Error 2";
+    if (sum != 0)
+        return "Error 3";
+    int cornMask = 0;
+    sum = 0;
+    for (int c = 0; c < 8; c++) {
+        cornMask |= 1 << (cc.ca[c] & 0xf);
+        sum += cc.ca[c] >> 4;
+    }
+    if (cornMask != 0xff)
+        return "Error 4";
+    if (sum % 3 != 0)
+        return "Error 5";
+    if ((getNParity(getNPermFull(cc.ea, 12), 12) ^ getNParity(getNPerm(cc.ca, 8), 8)) != 0)
+        return "Error 6";
+    Search search;
+    return search.solution(cc, 21, 1000000000, 50, false, -1, -1);
+}
+
 std::string gen333(Rng &rng, const std::string &eventId)
 {
     if (eventId == "333" || eventId == "333oh")

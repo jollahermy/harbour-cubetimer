@@ -9,14 +9,14 @@ even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE
 General Public License below for more details.
 
 Third-party code:
-- qml/js/scramble_worker.js contains the WCA scramble generators of csTimer
+- src/scramble/ is a C++ port of the WCA scramble generators of csTimer
   (https://github.com/cs0x7f/cstimer, commit 2547d82), including the min2phase 3x3x3 solver and
-  the 4x4x4 solver, Copyright (C) Shuang Chen (cs0x7f) and contributors, GPL-3.0; and the ISAAC
-  PRNG implementation, Copyright (c) 2012 Yves-Marie K. Rinquin, MIT License.
-  Changes made for this app (see the build script in the source repository): ES5 transpiling and
-  polyfills for the Qt 5.6 JavaScript engine; integer-safe parseMask and getNPerm/setNPerm
-  (works around Qt 5.6 V4 number-conversion bugs, same results); Pyraminx random-state filter
-  changed to WCA Regulation 4b3f (state including tips needs at least 6 moves).
+  the 4x4x4 reduction solver, Copyright (C) Shuang Chen (cs0x7f) and contributors, GPL-3.0; and of
+  the ISAAC PRNG implementation used by csTimer, Copyright (c) 2012 Yves-Marie K. Rinquin, MIT
+  License. The port reproduces csTimer's output exactly for the same random seed (verified per
+  event against csTimer's JavaScript). Changes: translated to C++; min2phase pruning tables are
+  built in full at start-up; Pyraminx random-state filter changed to WCA Regulation 4b3f (state
+  including tips needs at least 6 moves).
 - Nunito font: SIL Open Font License 1.1 (qml/fonts/OFL.txt).
 
 ------------------------------------------------------------------------------------------------

@@ -3,7 +3,6 @@
 #include <QtCore/QCoreApplication>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
-#include <QtCore/QStringList>
 #include <chrono>
 #include <vector>
 
@@ -18,12 +17,6 @@ struct ReplyEvent : public QEvent {
 NativeScrambler::NativeScrambler(const QString &entropyHex, QObject *parent)
     : QObject(parent), seed_(entropyHex.toStdString())
 {
-    QStringList events;
-    for (const char *e : { "222", "333", "333oh", "333bld", "333fm", "444", "444bld", "555", "555bld",
-                           "666", "777", "pyram", "skewb", "minx", "sq1", "clock" })
-        if (ct::Scrambler::supported(e))
-            events << QString::fromLatin1(e);
-    map_.insert(QStringLiteral("events"), events.join(QLatin1Char(',')));   // natively available events
     map_.insert(QStringLiteral("reply"), QString());
     map_.insert(QStringLiteral("request"), QString());
     connect(&map_, &QQmlPropertyMap::valueChanged, this, &NativeScrambler::onRequest);

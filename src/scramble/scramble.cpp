@@ -112,7 +112,7 @@ std::string normalizeScramble(const std::string &raw)
 bool Scrambler::supported(const std::string &e)
 {
     return e == "555" || e == "555bld" || e == "666" || e == "777" || e == "clock" || e == "minx"
-        || gen333Supported(e) || gen222Supported(e) || genPyrSupported(e) || genSkbSupported(e) || genSq1Supported(e);
+        || gen333Supported(e) || gen444Supported(e) || gen222Supported(e) || genPyrSupported(e) || genSkbSupported(e) || genSq1Supported(e);
 }
 
 std::string Scrambler::generate(const std::string &e)
@@ -130,6 +130,7 @@ std::string Scrambler::generate(const std::string &e)
         static const std::vector<std::string> kRotY = { "", " 3Uw", " 3Uw2", " 3Uw'" };
         s = cubeBig(5, 60) + mega(kNone, kRotX, 1) + mega(kNone, kRotY, 1);
     } else if (gen333Supported(e)) s = gen333(rng_, e);
+    else if (gen444Supported(e)) s = gen444(rng_, e);
     else if (gen222Supported(e)) s = gen222(rng_, e);
     else if (genPyrSupported(e)) s = genPyr(rng_, e);
     else if (genSkbSupported(e)) s = genSkb(rng_, e);

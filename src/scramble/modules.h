@@ -20,5 +20,10 @@ bool genSkbSupported(const std::string &eventId);
 // ssq1.cpp: Square-1
 std::string genSq1(Rng &rng, const std::string &eventId);
 bool genSq1Supported(const std::string &eventId);
+// s444.cpp: 4x4x4 (444, 444bld)
+std::string gen444(Rng &rng, const std::string &eventId);
+bool gen444Supported(const std::string &eventId);
+// s333.cpp: min2phase solve of a 54-facelet string (scramble_333.solvFacelet), for the 4x4 3x3 stage.
+std::string solveFacelet333(const std::string &facelet);
 } // namespace ct
 #endif

@@ -4,7 +4,6 @@ import QtQuick.LocalStorage 2.0 as Sql
 import QtGraphicalEffects 1.0
 import QtFeedback 5.0
 import Nemo.KeepAlive 1.2
-import "../js/scramble.js" as Scramble
 import "../js/stats.js" as Stats
 import "../js/scrambleLayout.js" as Layout
 import "../components"
@@ -36,7 +35,7 @@ Page {
     readonly property real trackK: 0.04
     readonly property real trackBigK: 0.02
 
-    // WCA events, in picker order. ids are the keys used by js/scramble.js.
+    // WCA events, in picker order. ids are the event keys of the native scrambler (src/scramble).
     readonly property var events: [
         { id: "333",    name: "3\u00d73\u00d73" },
         { id: "222",    name: "2\u00d72\u00d72" },
@@ -157,7 +156,6 @@ Page {
     property string timeText: "0.00"                 // big time
     property string subText: ""                      // DNF raw time or +2 total, under the big time
     property string phase: "idle"                    // idle | holding | running
-    onPhaseChanged: if (phase === "idle") scrPump()  // resume the scramble pool refill after a solve
     property bool ready: false                       // hold >= readyDelayMs
     property bool pinching: false                    // two-finger gesture in progress
     property real holdStart: 0
@@ -297,23 +295,6 @@ Page {
             if (!Array.isArray(list)) list = [];
             list = sanitizeSessions(list);
             sessions = list;
-            // Backfill: solves saved before scrambles were stored get a random scramble of their
-            // event, once. Written straight to the settings row (persist() needs the counters
-            // that are not loaded yet).
-            var filled = 0;
-            for (var si = 0; si < list.length; si++) {
-                var ss = list[si].solves || [];
-                for (var sk = 0; sk < ss.length; sk++) {
-                    if (!ss[sk].scramble) {
-                        ss[sk].scramble = Scramble.generate(ss[sk].event || list[si].event);
-                        filled++;
-                    }
-                }
-            }
-            if (filled > 0) {
-                setSetting("sessions", JSON.stringify(list));
-                console.log("cube-timer: backfilled scrambles for " + filled + " solves");
-            }
             // Per-event session counters: the highest "Session N" ever handed out for each event
             // (survives deletions). Initialised from the stored map and from the existing sessions
             // of that event; renamed sessions are ignored (their number is not known).
@@ -558,144 +539,26 @@ Page {
 
     // ---- solve state ----------------------------------------------------
     // ---- WCA scrambles -----------------------------------------------------
-    // Generated in one WorkerScript (js/scramble_worker.js: csTimer generators, GPL-3.0). Qt 5.6 runs
-    // all WorkerScripts of an engine on ONE shared thread, so requests are FIFO.
-    // Pool: pre-generated scrambles per event, persisted in LocalStorage (table scramble_pool), so even
-    // the first scramble after start is instant (csTimer caches 4x4 scrambles the same way). A pooled
-    // scramble is used once and deleted. Refill runs one background request at a time, so a request
-    // for the shown scramble waits behind at most one job.
-    readonly property var scrPoolTarget: ({ "444": 12, "444bld": 12 })   // every other event: 6
-    function scrTarget(ev) {
-        if (scrIsNative(ev)) return 0;               // native C++ generator: fast enough, no pool needed
-        return scrPoolTarget[ev] !== undefined ? scrPoolTarget[ev] : 6;
-    }
-    // Native C++ scrambler (src/scramble, bit-exact csTimer port) for the events it already covers;
-    // the others still use the JS worker until they are ported.
-    readonly property var scrNativeEvents: (typeof nativeScrambler !== "undefined" && nativeScrambler)
-                                           ? String(nativeScrambler.events).split(",") : []
-    function scrIsNative(ev) { return scrNativeEvents.indexOf(ev) >= 0; }
-    property string scrNativeReply: (typeof nativeScrambler !== "undefined" && nativeScrambler) ? nativeScrambler.reply : ""
-    onScrNativeReplyChanged: if (scrNativeReply !== "") scrOnReply(JSON.parse(scrNativeReply))
-    property var scrPool: ({})                       // event id -> [{id, s}] (oldest first)
+    // Generated natively (src/scramble: C++ port of csTimer, GPL-3.0) on a worker thread, through the
+    // nativeScrambler property map: QML writes a JSON request, the reply arrives in .reply. Only the
+    // latest request counts; a reply for an older one (event switched meanwhile) is ignored.
     property int scrReqSeq: 0
-    property int scrCurrentReq: -1                   // request for the shown scramble: -1 none, -2 = the background one
-    property string scrCurrentEvent: ""
-    property int scrBgReq: -1                        // the one background refill request in flight (-1 none)
-    property string scrBgEvent: ""
+    property int scrCurrentReq: -1                   // request for the shown scramble (-1: none)
     readonly property bool scramblePending: scramble === "" && scrCurrentReq !== -1
-
-    function scrLoadPool() {
-        var pool = {};
-        if (!db) return;
-        db.transaction(function (tx) {
-            tx.executeSql("CREATE TABLE IF NOT EXISTS scramble_pool(id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, scramble TEXT)");
-            // Events generated natively need no pool: drop their old pooled scrambles.
-            for (var n = 0; n < scrNativeEvents.length; n++)
-                tx.executeSql("DELETE FROM scramble_pool WHERE event = ?", [scrNativeEvents[n]]);
-            var r = tx.executeSql("SELECT id, event, scramble FROM scramble_pool ORDER BY id");
-            for (var i = 0; i < r.rows.length; i++) {
-                var it = r.rows.item(i);
-                if (!pool[it.event]) pool[it.event] = [];
-                pool[it.event].push({ id: it.id, s: it.scramble });
-            }
-        });
-        scrPool = pool;
+    property string scrReply: nativeScrambler.reply
+    onScrReplyChanged: {
+        if (scrReply === "") return;
+        var m = JSON.parse(scrReply);
+        if (m.reqId !== scrCurrentReq) return;
+        scrCurrentReq = -1;
+        if (m.error) console.log("scramble error (" + m.event + "): " + m.error);
+        else if (m.event === currentEvent.id && scramble === "") scramble = m.scramble;
     }
-    function scrPoolAdd(ev, s) {
-        var id = -1;
-        db.transaction(function (tx) {
-            var r = tx.executeSql("INSERT INTO scramble_pool(event, scramble) VALUES(?, ?)", [ev, s]);
-            id = Number(r.insertId);
-        });
-        var pool = scrPool;
-        if (!pool[ev]) pool[ev] = [];
-        pool[ev].push({ id: id, s: s });
-        scrPool = pool;
-    }
-    function scrPoolTake(ev) {
-        var pool = scrPool;
-        if (!pool[ev] || pool[ev].length === 0) return "";
-        var e = pool[ev].shift();
-        scrPool = pool;
-        db.transaction(function (tx) { tx.executeSql("DELETE FROM scramble_pool WHERE id = ?", [e.id]); });
-        return e.s;
-    }
-    function scrSend(ev) {
-        scrReqSeq += 1;
-        if (scrIsNative(ev)) nativeScrambler.request = JSON.stringify({ reqId: scrReqSeq, event: ev });
-        else scrWorker.sendMessage({ cmd: "gen", reqId: scrReqSeq, event: ev });
-        return scrReqSeq;
-    }
-    // Start the next background refill if the worker is idle. Order: every event up to 1 (shown event
-    // first, 4x4 last), then every event up to its target.
-    function scrPump() {
-        if (scrBgReq !== -1 || scrCurrentReq !== -1) return;
-        if (phase !== "idle") return;                // no background refill while holding / timing
-        var order = [currentEvent.id];
-        var i;
-        for (i = 0; i < events.length; i++)
-            if (events[i].id !== currentEvent.id && events[i].id !== "444" && events[i].id !== "444bld") order.push(events[i].id);
-        if (currentEvent.id !== "444") order.push("444");
-        if (currentEvent.id !== "444bld") order.push("444bld");
-        for (var pass = 0; pass < 2; pass++) {
-            for (i = 0; i < order.length; i++) {
-                var ev = order[i];
-                var have = scrPool[ev] ? scrPool[ev].length : 0;
-                if (have < (pass === 0 ? 1 : scrTarget(ev))) {
-                    scrBgEvent = ev;
-                    scrBgReq = scrSend(ev);
-                    return;
-                }
-            }
-        }
-    }
-    // Next scramble for the shown event: from the pool at once, else ask and show a placeholder.
-    function takeScramble() {
-        var ev = currentEvent.id;
-        var s = scrIsNative(ev) ? "" : scrPoolTake(ev);   // native events: always fresh (instant)
-        if (s !== "") {
-            scrCurrentReq = -1;
-            scrPump();
-            return s;
-        }
-        if (scrCurrentReq !== -1 && scrCurrentEvent === ev) return "";        // already waiting
-        scrCurrentEvent = ev;
-        if (scrBgReq !== -1 && scrBgEvent === ev) { scrCurrentReq = -2; return ""; }   // its reply fills it
-        scrCurrentReq = scrSend(ev);
-        return "";
-    }
-    function scrOnReply(m) {
-        if (m.cmd === "tables") {
-            if (m.note !== "ok") console.log("4x4 table not loaded: " + m.note);
-            return;
-        }
-        if (m.error) console.log("scramble worker error (" + m.event + "): " + m.error);
-        var wasBg = (m.reqId === scrBgReq);
-        if (wasBg) scrBgReq = -1;
-        var forCurrent = (m.reqId === scrCurrentReq) || (wasBg && scrCurrentReq === -2 && m.event === scrCurrentEvent);
-        if (forCurrent) scrCurrentReq = -1;
-        if (m.scramble) {
-            if (forCurrent && scramble === "" && m.event === currentEvent.id) scramble = m.scramble;
-            else scrPoolAdd(m.event, m.scramble);
-        }
-        scrPump();
-    }
-    WorkerScript {
-        id: scrWorker
-        source: "../js/scramble_worker.js"
-        onMessage: page.scrOnReply(messageObject)
-    }
-    function scrStartWorker() {
-        // Kernel entropy from C++ (/dev/urandom), mixed with time and Math.random as a fallback.
-        var seed = (typeof entropySeed === "string" ? entropySeed : "") + "|" + Date.now() + "|" + Math.random();
-        scrWorker.sendMessage({ cmd: "seed", seed: seed });
-        // Shipped 4x4 tables: save ~28 s of the first 4x4 scramble (checked by the worker).
-        scrWorker.sendMessage({ cmd: "tables", url: Qt.resolvedUrl("../js/444_tables.bin").toString() });
-    }
-
     function newScramble() {
         scramble = "";
-        scramble = takeScramble();
+        scrReqSeq += 1;
+        scrCurrentReq = scrReqSeq;
+        nativeScrambler.request = JSON.stringify({ reqId: scrReqSeq, event: currentEvent.id });
     }
 
     // Scramble history (in memory): one step back (prevScramble) and one step forward (fwdScramble).
@@ -712,8 +575,7 @@ Page {
             scramble = fwdScramble;
             fwdScramble = "";
         } else {
-            scramble = "";
-            scramble = takeScramble();
+            newScramble();
         }
     }
     function swipeBack() {
@@ -721,12 +583,12 @@ Page {
         fwdScramble = scramble;
         scramble = prevScramble;
         prevScramble = "";
+        scrCurrentReq = -1;                          // a scramble still being generated is dropped
     }
     function scrambleAfterSolve() {
         prevScramble = scramble;
         fwdScramble = "";
-        scramble = "";
-        scramble = takeScramble();
+        newScramble();
     }
 
     // Show the last solve of the current session (or 0.00) in the display labels.
@@ -947,10 +809,8 @@ Page {
 
     Component.onCompleted: {
         loadSettings();
-        scrLoadPool();
-        scrStartWorker();                            // seed + 4x4 table before the first request (FIFO)
+        if (db) db.transaction(function (tx) { tx.executeSql("DROP TABLE IF EXISTS scramble_pool"); });   // old JS-era cache
         newScramble();
-        scrPump();
         showSolve();
     }
 
