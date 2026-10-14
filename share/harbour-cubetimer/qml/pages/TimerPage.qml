@@ -556,8 +556,86 @@ Page {
     }
 
     // ---- solve state ----------------------------------------------------
+    // ---- WCA scrambles: generated in a WorkerScript (js/scramble_worker.js) ----
+    // One request is "current" (its reply becomes the shown scramble); every other reply is kept
+    // as a prefetched scramble for its event (one per event), so the next one is usually ready.
+    property int scrReqSeq: 0
+    property int scrCurrentReq: -1                   // reqId whose reply becomes `scramble`
+    property var scrReady: ({})                      // event id -> prefetched scramble
+    property var scrInFlight: ({})                   // event id -> number of prefetch requests in flight
+    readonly property bool scramblePending: scramble === "" && scrCurrentReq >= 0
+    function scrRequest(eventId, asCurrent) {
+        scrReqSeq += 1;
+        if (asCurrent) scrCurrentReq = scrReqSeq;
+        else { var f = scrInFlight; f[eventId] = (f[eventId] || 0) + 1; scrInFlight = f; }
+        scrWorkerFor(eventId).sendMessage({ cmd: "gen", reqId: scrReqSeq, event: eventId });
+    }
+    function scrPrefetch(eventId) {
+        if (scrReady[eventId] === undefined && !(scrInFlight[eventId] > 0)) scrRequest(eventId, false);
+    }
+    // Next scramble for the current event: a prefetched one at once, else ask and show a placeholder.
+    function takeScramble() {
+        var ev = currentEvent.id;
+        var r = scrReady;
+        if (r[ev] !== undefined) {
+            var s = r[ev];
+            delete r[ev];
+            scrReady = r;
+            scrCurrentReq = -1;
+            scrPrefetch(ev);
+            return s;
+        }
+        scrRequest(ev, true);
+        return "";
+    }
+    function scrOnReply(m) {
+        if (m.error) console.log("scramble worker error (" + m.event + "): " + m.error);
+        if (m.reqId === scrCurrentReq) {
+            scrCurrentReq = -1;
+            if (m.event === currentEvent.id && scramble === "") {
+                scramble = m.scramble;
+                scrPrefetch(m.event);
+                return;
+            }
+        } else {
+            var f = scrInFlight;
+            if (f[m.event] > 0) f[m.event] -= 1;
+            scrInFlight = f;
+        }
+        if (m.scramble && scrReady[m.event] === undefined) {
+            var r = scrReady;
+            r[m.event] = m.scramble;
+            scrReady = r;
+        }
+        // A prefetched reply that arrives while the current event still waits fills it right away.
+        if (scramble === "" && m.event === currentEvent.id && scrReady[m.event] !== undefined) {
+            scramble = takeScramble();
+        }
+    }
+    // Two workers: 4x4 jobs (first one builds tables for ~40 s) never block the other events.
+    WorkerScript {
+        id: scrWorker
+        source: "../js/scramble_worker.js"
+        onMessage: page.scrOnReply(messageObject)
+    }
+    WorkerScript {
+        id: scrWorker444
+        source: "../js/scramble_worker.js"
+        onMessage: page.scrOnReply(messageObject)
+    }
+    function scrWorkerFor(eventId) {
+        return (eventId === "444" || eventId === "444bld") ? scrWorker444 : scrWorker;
+    }
+    function scrSeedWorker() {
+        // Kernel entropy from C++ (/dev/urandom), mixed with time and Math.random as a fallback.
+        var seed = (typeof entropySeed === "string" ? entropySeed : "") + "|" + Date.now() + "|" + Math.random();
+        scrWorker.sendMessage({ cmd: "seed", seed: seed + "|a" });
+        scrWorker444.sendMessage({ cmd: "seed", seed: seed + "|b" });
+    }
+
     function newScramble() {
-        scramble = Scramble.generate(currentEvent.id);
+        scramble = "";
+        scramble = takeScramble();
     }
 
     // Scramble history (in memory): one step back (prevScramble) and one step forward (fwdScramble).
@@ -574,7 +652,8 @@ Page {
             scramble = fwdScramble;
             fwdScramble = "";
         } else {
-            scramble = Scramble.generate(currentEvent.id);
+            scramble = "";
+            scramble = takeScramble();
         }
     }
     function swipeBack() {
@@ -586,7 +665,8 @@ Page {
     function scrambleAfterSolve() {
         prevScramble = scramble;
         fwdScramble = "";
-        scramble = Scramble.generate(currentEvent.id);
+        scramble = "";
+        scramble = takeScramble();
     }
 
     // Show the last solve of the current session (or 0.00) in the display labels.
@@ -807,6 +887,7 @@ Page {
 
     Component.onCompleted: {
         loadSettings();
+        scrSeedWorker();                             // before the first request (worker handles messages in order)
         newScramble();
         showSolve();
     }
@@ -1113,7 +1194,7 @@ Page {
                 id: scrambleText
                 anchors.top: parent.top
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: page.scramble
+                text: page.scramble !== "" ? page.scramble : (page.scramblePending ? "Generating scramble\u2026" : "")
                 eventId: page.currentEvent.id
                 maxWidth: page.scrambleWidth
                 maxHeight: page.scrambleMaxHeight
