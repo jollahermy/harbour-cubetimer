@@ -2,3 +2,4 @@
 *.o
 bin/harbour-cubetimer
 src/harbour-cubetimer
+build/

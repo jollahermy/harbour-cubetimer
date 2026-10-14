@@ -565,7 +565,17 @@ Page {
     // scramble is used once and deleted. Refill runs one background request at a time, so a request
     // for the shown scramble waits behind at most one job.
     readonly property var scrPoolTarget: ({ "444": 12, "444bld": 12 })   // every other event: 6
-    function scrTarget(ev) { return scrPoolTarget[ev] !== undefined ? scrPoolTarget[ev] : 6; }
+    function scrTarget(ev) {
+        if (scrIsNative(ev)) return 0;               // native C++ generator: fast enough, no pool needed
+        return scrPoolTarget[ev] !== undefined ? scrPoolTarget[ev] : 6;
+    }
+    // Native C++ scrambler (src/scramble, bit-exact csTimer port) for the events it already covers;
+    // the others still use the JS worker until they are ported.
+    readonly property var scrNativeEvents: (typeof nativeScrambler !== "undefined" && nativeScrambler)
+                                           ? String(nativeScrambler.events).split(",") : []
+    function scrIsNative(ev) { return scrNativeEvents.indexOf(ev) >= 0; }
+    property string scrNativeReply: (typeof nativeScrambler !== "undefined" && nativeScrambler) ? nativeScrambler.reply : ""
+    onScrNativeReplyChanged: if (scrNativeReply !== "") scrOnReply(JSON.parse(scrNativeReply))
     property var scrPool: ({})                       // event id -> [{id, s}] (oldest first)
     property int scrReqSeq: 0
     property int scrCurrentReq: -1                   // request for the shown scramble: -1 none, -2 = the background one
@@ -579,6 +589,9 @@ Page {
         if (!db) return;
         db.transaction(function (tx) {
             tx.executeSql("CREATE TABLE IF NOT EXISTS scramble_pool(id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, scramble TEXT)");
+            // Events generated natively need no pool: drop their old pooled scrambles.
+            for (var n = 0; n < scrNativeEvents.length; n++)
+                tx.executeSql("DELETE FROM scramble_pool WHERE event = ?", [scrNativeEvents[n]]);
             var r = tx.executeSql("SELECT id, event, scramble FROM scramble_pool ORDER BY id");
             for (var i = 0; i < r.rows.length; i++) {
                 var it = r.rows.item(i);
@@ -609,7 +622,8 @@ Page {
     }
     function scrSend(ev) {
         scrReqSeq += 1;
-        scrWorker.sendMessage({ cmd: "gen", reqId: scrReqSeq, event: ev });
+        if (scrIsNative(ev)) nativeScrambler.request = JSON.stringify({ reqId: scrReqSeq, event: ev });
+        else scrWorker.sendMessage({ cmd: "gen", reqId: scrReqSeq, event: ev });
         return scrReqSeq;
     }
     // Start the next background refill if the worker is idle. Order: every event up to 1 (shown event
@@ -638,7 +652,7 @@ Page {
     // Next scramble for the shown event: from the pool at once, else ask and show a placeholder.
     function takeScramble() {
         var ev = currentEvent.id;
-        var s = scrPoolTake(ev);
+        var s = scrIsNative(ev) ? "" : scrPoolTake(ev);   // native events: always fresh (instant)
         if (s !== "") {
             scrCurrentReq = -1;
             scrPump();
@@ -675,8 +689,8 @@ Page {
         // Kernel entropy from C++ (/dev/urandom), mixed with time and Math.random as a fallback.
         var seed = (typeof entropySeed === "string" ? entropySeed : "") + "|" + Date.now() + "|" + Math.random();
         scrWorker.sendMessage({ cmd: "seed", seed: seed });
-        // Shipped 4x4 table: saves ~21 s of the first 4x4 scramble (checked by the worker).
-        scrWorker.sendMessage({ cmd: "tables", url: Qt.resolvedUrl("../js/444_edge3prun.bin").toString() });
+        // Shipped 4x4 tables: save ~28 s of the first 4x4 scramble (checked by the worker).
+        scrWorker.sendMessage({ cmd: "tables", url: Qt.resolvedUrl("../js/444_tables.bin").toString() });
     }
 
     function newScramble() {

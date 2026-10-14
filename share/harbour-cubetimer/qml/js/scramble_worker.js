@@ -10259,7 +10259,7 @@ var WcaScramble = function () {
 function parseTables444(buf) {
 	// Returns {tables, ok, note}. Verifies magic, header and the int32 sum/xor of the data region.
 	var u8 = new Uint8Array(buf);
-	if (u8.length < 8 || String.fromCharCode(u8[0], u8[1], u8[2], u8[3]) !== "CT44") return { ok: false, note: "bad magic" };
+	if (u8.length < 8 || String.fromCharCode(u8[0], u8[1], u8[2], u8[3]) !== "CT44") return { ok: false, note: "bad magic (" + u8.length + " bytes, type " + (typeof buf) + ")" };
 	var hlen = u8[4] | (u8[5] << 8) | (u8[6] << 16) | (u8[7] << 24);
 	var hs = "";
 	for (var i = 8; i < 8 + hlen; i++) hs += String.fromCharCode(u8[i]);
