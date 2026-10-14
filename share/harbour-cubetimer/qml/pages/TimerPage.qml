@@ -895,9 +895,10 @@ Page {
             MouseArea {
                 id: touch
                 anchors.fill: parent
-                // While holding/running, keep the grab: otherwise a few px of finger drift lets
-                // the page flickable (PullDownMenu) steal it -> onCanceled -> hold cancelled.
-                preventStealing: page.phase === "holding" || page.phase === "running"
+                // Keep the grab only once the hold is ready (green) or the solve is running:
+                // before ready, a drag may still go to the page flickable (PullDownMenu) and
+                // cancel the hold; after ready, finger drift can no longer cancel it.
+                preventStealing: (page.phase === "holding" && page.ready) || page.phase === "running"
                 onPressed: {
                     if (page.statsPress(mouse.x, mouse.y) === "consume") return;
                     page.onPress();
