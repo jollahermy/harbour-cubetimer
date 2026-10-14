@@ -563,7 +563,7 @@ Page {
     property int scrCurrentReq: -1                   // reqId whose reply becomes `scramble`
     property var scrReady: ({})                      // event id -> prefetched scramble
     property var scrInFlight: ({})                   // event id -> number of prefetch requests in flight
-    readonly property bool scramblePending: scramble === "" && scrCurrentReq >= 0
+    readonly property bool scramblePending: scramble === "" && scrCurrentReq !== -1
     function scrRequest(eventId, asCurrent) {
         scrReqSeq += 1;
         if (asCurrent) scrCurrentReq = scrReqSeq;
@@ -585,8 +585,26 @@ Page {
             scrPrefetch(ev);
             return s;
         }
+        // Already waiting for this event (e.g. swipes while the first 4x4 builds its tables):
+        // do not queue a second "current" request behind the first.
+        if (scrCurrentReq !== -1 && scrCurrentEvent === ev) return "";
+        // A prefetch for this event is already running: let its reply fill the scramble.
+        if (scrInFlight[ev] > 0) { scrCurrentReq = -2; scrCurrentEvent = ev; return ""; }
+        scrCurrentEvent = ev;
         scrRequest(ev, true);
         return "";
+    }
+    property string scrCurrentEvent: ""
+    // Once at start-up: one prefetched scramble for every event except 4x4 (its first scramble builds
+    // ~40 s of tables), so the first switch to an event is instant. Costs ~5 s of background CPU.
+    property bool scrWarmed: false
+    function scrWarmAll() {
+        if (scrWarmed) return;
+        scrWarmed = true;
+        for (var i = 0; i < events.length; i++) {
+            var ev = events[i].id;
+            if (ev !== "444" && ev !== "444bld" && ev !== currentEvent.id) scrPrefetch(ev);
+        }
     }
     function scrOnReply(m) {
         if (m.error) console.log("scramble worker error (" + m.event + "): " + m.error);
@@ -595,6 +613,7 @@ Page {
             if (m.event === currentEvent.id && scramble === "") {
                 scramble = m.scramble;
                 scrPrefetch(m.event);
+                scrWarmAll();
                 return;
             }
         } else {
@@ -612,25 +631,19 @@ Page {
             scramble = takeScramble();
         }
     }
-    // Two workers: 4x4 jobs (first one builds tables for ~40 s) never block the other events.
+    // One worker. Qt 5.6 runs every WorkerScript of an engine on ONE shared thread, so a second
+    // worker would not run in parallel (measured: a 333 request waited for the 34 s 4x4 table build).
+    // Requests are FIFO; the start-up warm-up therefore goes before any 4x4 request.
     WorkerScript {
         id: scrWorker
         source: "../js/scramble_worker.js"
         onMessage: page.scrOnReply(messageObject)
     }
-    WorkerScript {
-        id: scrWorker444
-        source: "../js/scramble_worker.js"
-        onMessage: page.scrOnReply(messageObject)
-    }
-    function scrWorkerFor(eventId) {
-        return (eventId === "444" || eventId === "444bld") ? scrWorker444 : scrWorker;
-    }
+    function scrWorkerFor(eventId) { return scrWorker; }
     function scrSeedWorker() {
         // Kernel entropy from C++ (/dev/urandom), mixed with time and Math.random as a fallback.
         var seed = (typeof entropySeed === "string" ? entropySeed : "") + "|" + Date.now() + "|" + Math.random();
-        scrWorker.sendMessage({ cmd: "seed", seed: seed + "|a" });
-        scrWorker444.sendMessage({ cmd: "seed", seed: seed + "|b" });
+        scrWorker.sendMessage({ cmd: "seed", seed: seed });
     }
 
     function newScramble() {
@@ -888,7 +901,9 @@ Page {
     Component.onCompleted: {
         loadSettings();
         scrSeedWorker();                             // before the first request (worker handles messages in order)
-        newScramble();
+        // FIFO worker: a 4x4 current request (first one ~40 s) must not delay the warm-up.
+        if (currentEvent.id === "444" || currentEvent.id === "444bld") { scrWarmAll(); newScramble(); }
+        else { newScramble(); scrWarmAll(); }
         showSolve();
     }
 
