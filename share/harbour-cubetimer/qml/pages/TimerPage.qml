@@ -174,6 +174,8 @@ Page {
     readonly property color textColor: Theme.primaryColor           // primary text: event title, times, list names
     // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
     readonly property color panelColor: Theme.rgba(Theme.highlightDimmerColor, 0.9)
+    // Solve popup card: same tint as the panels but fully opaque.
+    readonly property color popupCardColor: Theme.rgba(Theme.highlightDimmerColor, 1.0)
     // Press feedback fill (rows, '+' circle, event name): Silica's pressed background.
     readonly property color pressFill: Theme.rgba(palette.highlightBackgroundColor, Theme.highlightBackgroundOpacity)
     // One corner radius for every raised card: solve popup and both drop-down lists.
@@ -452,6 +454,7 @@ Page {
     }
     // Inline session drop-down under the session row (no separate page).
     property bool sessionMenuOpen: false
+    readonly property bool pullDownAllowed: hasSolves && !eventMenuOpen && !sessionMenuOpen
     readonly property var sessionMenuItems: listSessionsForEvent()
     // Discoverability peek: the current row nudges left on the first 5 menu opens only.
     property int peekCount: 0
@@ -831,11 +834,12 @@ Page {
         anchors.fill: parent
         contentHeight: height
         // No pull-down menu without solves: stop at the bounds so nothing overshoots.
-        boundsBehavior: page.hasSolves ? Flickable.DragAndOvershootBounds : Flickable.StopAtBounds
+        boundsBehavior: page.pullDownAllowed ? Flickable.DragAndOvershootBounds : Flickable.StopAtBounds
 
         // Pull-down: solve actions on the last solve of the current session.
         PullDownMenu {
-            enabled: page.hasSolves
+            // Off while the event or session drop-down is open (drags there must not pull the menu).
+            enabled: page.pullDownAllowed
             visible: page.hasSolves
             MenuItem {
 
@@ -1788,7 +1792,7 @@ Page {
             anchors.centerIn: parent
             width: parent.width - 2 * Theme.horizontalPageMargin
             height: cardCol.height + 2 * Theme.paddingLarge
-            color: page.panelColor
+            color: page.popupCardColor              // opaque (user: the solve popup must not be see-through)
             radius: page.cornerRadius
             scale: page.popupOpen ? 1 : 0.9
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
