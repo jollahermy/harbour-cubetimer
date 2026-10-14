@@ -4920,7 +4920,7 @@ var scramble_333 = function (getNPerm, setNPerm, getNParity, rn, rndEl) {
   };
 }(mathlib.getNPerm, mathlib.setNPerm, mathlib.getNParity, mathlib.rn, mathlib.rndEl);
 
-// ===== scramble/scramble_444.js[test hooks] =====
+// ===== scramble/scramble_444.js[shipped Edge3Prun + test hooks] =====
 "use strict";
 var scramble_444 = function (Cnk, circle) {
   var PHASE1_SOLS = 10000;
@@ -7096,6 +7096,7 @@ var scramble_444 = function (Cnk, circle) {
     }
   }
   var searcher;
+  var preEdge3Prun = null;
   function init() {
     init = nullMethod;
     var tt = $.now();
@@ -7126,7 +7127,12 @@ var scramble_444 = function (Cnk, circle) {
     DEBUG && console.log('[scramble 444] initEdge3MvRot', $.now() - tt);
     initEdge3Sym2Raw();
     DEBUG && console.log('[scramble 444] initEdge3Sym2Raw', $.now() - tt);
-    initEdge3Prun();
+    if (preEdge3Prun) {
+      Edge3Prun = preEdge3Prun; // shipped table (deterministic, checksummed by the worker)
+      preEdge3Prun = null;
+    } else {
+      initEdge3Prun();
+    }
     DEBUG && console.log('[scramble 444] initEdge3Prun', $.now() - tt);
     searcher = new Search_4();
   }
@@ -7783,8 +7789,17 @@ var scramble_444 = function (Cnk, circle) {
   return {
     getRandomScramble: getRandomScramble,
     getPartialScramble: getPartialScramble,
+    setEdge3Prun: function setEdge3Prun(t) {
+      preEdge3Prun = t;
+    },
     __partialSolvedState: partialSolvedState,
     __genFacelet: genFacelet,
+    __tables: function __tables() {
+      init();
+      return {
+        Edge3Prun: Edge3Prun
+      };
+    },
     testbench: testbench
   };
 }(mathlib.Cnk, mathlib.circle);
@@ -10185,6 +10200,25 @@ var WcaScramble = function () {
 WorkerScript.onMessage = function(msg) {
 	if (msg.cmd === "seed") {
 		WcaScramble.seed(msg.seed);
+		return;
+	}
+	if (msg.cmd === "tables") {
+		// Shipped 4x4 Edge3Prun table (saves ~21 s of the first 4x4 scramble). Checked before use;
+		// on any problem the worker silently falls back to computing it.
+		var t0 = Date.now(), note = "";
+		try {
+			var x = new XMLHttpRequest();
+			x.open("GET", msg.url, false);
+			x.responseType = "arraybuffer";
+			x.send();
+			var buf = x.response;
+			var a = (buf && buf.byteLength === 7751520) ? new Int32Array(buf) : null;
+			var s = 0, xr = 0;
+			if (a) for (var i = 0; i < a.length; i++) { s = (s + a[i]) | 0; xr ^= a[i]; }
+			if (a && s === -1302533572 && xr === -1754566360) { scramble_444.setEdge3Prun(a); note = "ok"; }
+			else note = "rejected (" + (buf ? buf.byteLength : "no data") + " bytes)";
+		} catch (e) { note = "error " + e; }
+		WorkerScript.sendMessage({ cmd: "tables", note: note, ms: Date.now() - t0 });
 		return;
 	}
 	if (msg.cmd === "gen") {

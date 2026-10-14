@@ -556,94 +556,125 @@ Page {
     }
 
     // ---- solve state ----------------------------------------------------
-    // ---- WCA scrambles: generated in a WorkerScript (js/scramble_worker.js) ----
-    // One request is "current" (its reply becomes the shown scramble); every other reply is kept
-    // as a prefetched scramble for its event (one per event), so the next one is usually ready.
+    // ---- WCA scrambles -----------------------------------------------------
+    // Generated in one WorkerScript (js/scramble_worker.js: csTimer generators, GPL-3.0). Qt 5.6 runs
+    // all WorkerScripts of an engine on ONE shared thread, so requests are FIFO.
+    // Pool: pre-generated scrambles per event, persisted in LocalStorage (table scramble_pool), so even
+    // the first scramble after start is instant (csTimer caches 4x4 scrambles the same way). A pooled
+    // scramble is used once and deleted. Refill runs one background request at a time, so a request
+    // for the shown scramble waits behind at most one job.
+    readonly property var scrPoolTarget: ({ "444": 12, "444bld": 12 })   // every other event: 6
+    function scrTarget(ev) { return scrPoolTarget[ev] !== undefined ? scrPoolTarget[ev] : 6; }
+    property var scrPool: ({})                       // event id -> [{id, s}] (oldest first)
     property int scrReqSeq: 0
-    property int scrCurrentReq: -1                   // reqId whose reply becomes `scramble`
-    property var scrReady: ({})                      // event id -> prefetched scramble
-    property var scrInFlight: ({})                   // event id -> number of prefetch requests in flight
+    property int scrCurrentReq: -1                   // request for the shown scramble: -1 none, -2 = the background one
+    property string scrCurrentEvent: ""
+    property int scrBgReq: -1                        // the one background refill request in flight (-1 none)
+    property string scrBgEvent: ""
     readonly property bool scramblePending: scramble === "" && scrCurrentReq !== -1
-    function scrRequest(eventId, asCurrent) {
+
+    function scrLoadPool() {
+        var pool = {};
+        if (!db) return;
+        db.transaction(function (tx) {
+            tx.executeSql("CREATE TABLE IF NOT EXISTS scramble_pool(id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT, scramble TEXT)");
+            var r = tx.executeSql("SELECT id, event, scramble FROM scramble_pool ORDER BY id");
+            for (var i = 0; i < r.rows.length; i++) {
+                var it = r.rows.item(i);
+                if (!pool[it.event]) pool[it.event] = [];
+                pool[it.event].push({ id: it.id, s: it.scramble });
+            }
+        });
+        scrPool = pool;
+    }
+    function scrPoolAdd(ev, s) {
+        var id = -1;
+        db.transaction(function (tx) {
+            var r = tx.executeSql("INSERT INTO scramble_pool(event, scramble) VALUES(?, ?)", [ev, s]);
+            id = Number(r.insertId);
+        });
+        var pool = scrPool;
+        if (!pool[ev]) pool[ev] = [];
+        pool[ev].push({ id: id, s: s });
+        scrPool = pool;
+    }
+    function scrPoolTake(ev) {
+        var pool = scrPool;
+        if (!pool[ev] || pool[ev].length === 0) return "";
+        var e = pool[ev].shift();
+        scrPool = pool;
+        db.transaction(function (tx) { tx.executeSql("DELETE FROM scramble_pool WHERE id = ?", [e.id]); });
+        return e.s;
+    }
+    function scrSend(ev) {
         scrReqSeq += 1;
-        if (asCurrent) scrCurrentReq = scrReqSeq;
-        else { var f = scrInFlight; f[eventId] = (f[eventId] || 0) + 1; scrInFlight = f; }
-        scrWorkerFor(eventId).sendMessage({ cmd: "gen", reqId: scrReqSeq, event: eventId });
+        scrWorker.sendMessage({ cmd: "gen", reqId: scrReqSeq, event: ev });
+        return scrReqSeq;
     }
-    function scrPrefetch(eventId) {
-        if (scrReady[eventId] === undefined && !(scrInFlight[eventId] > 0)) scrRequest(eventId, false);
+    // Start the next background refill if the worker is idle. Order: every event up to 1 (shown event
+    // first, 4x4 last), then every event up to its target.
+    function scrPump() {
+        if (scrBgReq !== -1 || scrCurrentReq !== -1) return;
+        var order = [currentEvent.id];
+        var i;
+        for (i = 0; i < events.length; i++)
+            if (events[i].id !== currentEvent.id && events[i].id !== "444" && events[i].id !== "444bld") order.push(events[i].id);
+        if (currentEvent.id !== "444") order.push("444");
+        if (currentEvent.id !== "444bld") order.push("444bld");
+        for (var pass = 0; pass < 2; pass++) {
+            for (i = 0; i < order.length; i++) {
+                var ev = order[i];
+                var have = scrPool[ev] ? scrPool[ev].length : 0;
+                if (have < (pass === 0 ? 1 : scrTarget(ev))) {
+                    scrBgEvent = ev;
+                    scrBgReq = scrSend(ev);
+                    return;
+                }
+            }
+        }
     }
-    // Next scramble for the current event: a prefetched one at once, else ask and show a placeholder.
+    // Next scramble for the shown event: from the pool at once, else ask and show a placeholder.
     function takeScramble() {
         var ev = currentEvent.id;
-        var r = scrReady;
-        if (r[ev] !== undefined) {
-            var s = r[ev];
-            delete r[ev];
-            scrReady = r;
+        var s = scrPoolTake(ev);
+        if (s !== "") {
             scrCurrentReq = -1;
-            scrPrefetch(ev);
+            scrPump();
             return s;
         }
-        // Already waiting for this event (e.g. swipes while the first 4x4 builds its tables):
-        // do not queue a second "current" request behind the first.
-        if (scrCurrentReq !== -1 && scrCurrentEvent === ev) return "";
-        // A prefetch for this event is already running: let its reply fill the scramble.
-        if (scrInFlight[ev] > 0) { scrCurrentReq = -2; scrCurrentEvent = ev; return ""; }
+        if (scrCurrentReq !== -1 && scrCurrentEvent === ev) return "";        // already waiting
         scrCurrentEvent = ev;
-        scrRequest(ev, true);
+        if (scrBgReq !== -1 && scrBgEvent === ev) { scrCurrentReq = -2; return ""; }   // its reply fills it
+        scrCurrentReq = scrSend(ev);
         return "";
     }
-    property string scrCurrentEvent: ""
-    // Once at start-up: one prefetched scramble for every event except 4x4 (its first scramble builds
-    // ~40 s of tables), so the first switch to an event is instant. Costs ~5 s of background CPU.
-    property bool scrWarmed: false
-    function scrWarmAll() {
-        if (scrWarmed) return;
-        scrWarmed = true;
-        for (var i = 0; i < events.length; i++) {
-            var ev = events[i].id;
-            if (ev !== "444" && ev !== "444bld" && ev !== currentEvent.id) scrPrefetch(ev);
-        }
-    }
     function scrOnReply(m) {
+        if (m.cmd === "tables") {
+            if (m.note !== "ok") console.log("4x4 table not loaded: " + m.note);
+            return;
+        }
         if (m.error) console.log("scramble worker error (" + m.event + "): " + m.error);
-        if (m.reqId === scrCurrentReq) {
-            scrCurrentReq = -1;
-            if (m.event === currentEvent.id && scramble === "") {
-                scramble = m.scramble;
-                scrPrefetch(m.event);
-                scrWarmAll();
-                return;
-            }
-        } else {
-            var f = scrInFlight;
-            if (f[m.event] > 0) f[m.event] -= 1;
-            scrInFlight = f;
+        var wasBg = (m.reqId === scrBgReq);
+        if (wasBg) scrBgReq = -1;
+        var forCurrent = (m.reqId === scrCurrentReq) || (wasBg && scrCurrentReq === -2 && m.event === scrCurrentEvent);
+        if (forCurrent) scrCurrentReq = -1;
+        if (m.scramble) {
+            if (forCurrent && scramble === "" && m.event === currentEvent.id) scramble = m.scramble;
+            else scrPoolAdd(m.event, m.scramble);
         }
-        if (m.scramble && scrReady[m.event] === undefined) {
-            var r = scrReady;
-            r[m.event] = m.scramble;
-            scrReady = r;
-        }
-        // A prefetched reply that arrives while the current event still waits fills it right away.
-        if (scramble === "" && m.event === currentEvent.id && scrReady[m.event] !== undefined) {
-            scramble = takeScramble();
-        }
+        scrPump();
     }
-    // One worker. Qt 5.6 runs every WorkerScript of an engine on ONE shared thread, so a second
-    // worker would not run in parallel (measured: a 333 request waited for the 34 s 4x4 table build).
-    // Requests are FIFO; the start-up warm-up therefore goes before any 4x4 request.
     WorkerScript {
         id: scrWorker
         source: "../js/scramble_worker.js"
         onMessage: page.scrOnReply(messageObject)
     }
-    function scrWorkerFor(eventId) { return scrWorker; }
-    function scrSeedWorker() {
+    function scrStartWorker() {
         // Kernel entropy from C++ (/dev/urandom), mixed with time and Math.random as a fallback.
         var seed = (typeof entropySeed === "string" ? entropySeed : "") + "|" + Date.now() + "|" + Math.random();
         scrWorker.sendMessage({ cmd: "seed", seed: seed });
+        // Shipped 4x4 table: saves ~21 s of the first 4x4 scramble (checked by the worker).
+        scrWorker.sendMessage({ cmd: "tables", url: Qt.resolvedUrl("../js/444_edge3prun.bin").toString() });
     }
 
     function newScramble() {
@@ -900,10 +931,10 @@ Page {
 
     Component.onCompleted: {
         loadSettings();
-        scrSeedWorker();                             // before the first request (worker handles messages in order)
-        // FIFO worker: a 4x4 current request (first one ~40 s) must not delay the warm-up.
-        if (currentEvent.id === "444" || currentEvent.id === "444bld") { scrWarmAll(); newScramble(); }
-        else { newScramble(); scrWarmAll(); }
+        scrLoadPool();
+        scrStartWorker();                            // seed + 4x4 table before the first request (FIFO)
+        newScramble();
+        scrPump();
         showSolve();
     }
 
