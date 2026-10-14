@@ -157,6 +157,7 @@ Page {
     property string timeText: "0.00"                 // big time
     property string subText: ""                      // DNF raw time or +2 total, under the big time
     property string phase: "idle"                    // idle | holding | running
+    onPhaseChanged: if (phase === "idle") scrPump()  // resume the scramble pool refill after a solve
     property bool ready: false                       // hold >= readyDelayMs
     property bool pinching: false                    // two-finger gesture in progress
     property real holdStart: 0
@@ -615,6 +616,7 @@ Page {
     // first, 4x4 last), then every event up to its target.
     function scrPump() {
         if (scrBgReq !== -1 || scrCurrentReq !== -1) return;
+        if (phase !== "idle") return;                // no background refill while holding / timing
         var order = [currentEvent.id];
         var i;
         for (i = 0; i < events.length; i++)

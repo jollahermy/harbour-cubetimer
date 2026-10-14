@@ -7097,6 +7097,7 @@ var scramble_444 = function (Cnk, circle) {
   }
   var searcher;
   var preEdge3Prun = null;
+  var preTables = null;
   function init() {
     init = nullMethod;
     var tt = $.now();
@@ -7108,6 +7109,55 @@ var scramble_444 = function (Cnk, circle) {
     $clinit_Edge3();
     $clinit_CornerCube();
     $clinit_FullCube_0();
+    if (preTables) {
+      Center1SymPrun = preTables.Center1SymPrun;
+      Center1SymMove = preTables.Center1SymMove;
+      finish_0 = preTables.finish_0;
+      Center1Sym2Raw = preTables.Center1Sym2Raw;
+      Center1RotPerm = preTables.Center1RotPerm;
+      SymInv = preTables.SymInv;
+      SymMove = preTables.SymMove;
+      SymMult = preTables.SymMult;
+      ctmv = preTables.ctmv;
+      ctprun = preTables.ctprun;
+      ctrot = preTables.ctrot;
+      pmv = preTables.pmv;
+      rlmv = preTables.rlmv;
+      rlrot = preTables.rlrot;
+      ctmove = preTables.ctmove;
+      pmove = preTables.pmove;
+      prun_0 = preTables.prun_0;
+      rl2std = preTables.rl2std;
+      cornerFacelet_0 = preTables.cornerFacelet_0;
+      FullEdgeMap = preTables.FullEdgeMap;
+      Edge3Prun = preTables.Edge3Prun;
+      factX = preTables.factX;
+      mvrot = preTables.mvrot;
+      mvroto = preTables.mvroto;
+      prunValues = preTables.prunValues;
+      Edge3Raw2Sym = preTables.Edge3Raw2Sym;
+      Edge3Sym2Raw = preTables.Edge3Sym2Raw;
+      Edge3Sym2Mask = preTables.Edge3Sym2Mask;
+      syminv_0 = preTables.syminv_0;
+      symstate = preTables.symstate;
+      move2rot = preTables.move2rot;
+      move2std = preTables.move2std;
+      move3std = preTables.move3std;
+      skipAxis = preTables.skipAxis;
+      skipAxis2 = preTables.skipAxis2;
+      skipAxis3 = preTables.skipAxis3;
+      epMoveMap = preTables.epMoveMap;
+      std2rl = preTables.std2rl;
+      std2move = preTables.std2move;
+      std3move = preTables.std3move;
+      ckmv = preTables.ckmv;
+      ckmv2_0 = preTables.ckmv2_0;
+      ckmv3 = preTables.ckmv3;
+      Edge3SymMove = preTables.Edge3SymMove;
+      preTables = null;
+      searcher = new Search_4();
+      return;
+    }
     DEBUG && console.log('[scramble 444] alloc tables', $.now() - tt);
     initSymMeta();
     DEBUG && console.log('[scramble 444] initSymMeta', $.now() - tt);
@@ -7792,6 +7842,9 @@ var scramble_444 = function (Cnk, circle) {
     setEdge3Prun: function setEdge3Prun(t) {
       preEdge3Prun = t;
     },
+    setTables: function setTables(t) {
+      preTables = t;
+    },
     __partialSolvedState: partialSolvedState,
     __genFacelet: genFacelet,
     __tables: function __tables() {
@@ -7799,6 +7852,12 @@ var scramble_444 = function (Cnk, circle) {
       return {
         Edge3Prun: Edge3Prun
       };
+    },
+    __peek: function __peek(n) {
+      return eval(n);
+    },
+    __init: function __init() {
+      init();
     },
     testbench: testbench
   };
@@ -10197,26 +10256,68 @@ var WcaScramble = function () {
     }
   };
 }();
+function parseTables444(buf) {
+	// Returns {tables, ok, note}. Verifies magic, header and the int32 sum/xor of the data region.
+	var u8 = new Uint8Array(buf);
+	if (u8.length < 8 || String.fromCharCode(u8[0], u8[1], u8[2], u8[3]) !== "CT44") return { ok: false, note: "bad magic" };
+	var hlen = u8[4] | (u8[5] << 8) | (u8[6] << 16) | (u8[7] << 24);
+	var hs = "";
+	for (var i = 8; i < 8 + hlen; i++) hs += String.fromCharCode(u8[i]);
+	var h = JSON.parse(hs);
+	var data = 8 + hlen;
+	while (data % 4) data++;
+	if ((buf.byteLength - data) % 4 !== 0) return { ok: false, note: "bad length" };
+	var w = new Int32Array(buf, data, (buf.byteLength - data) / 4);
+	var s = 0, x = 0;
+	for (var j = 0; j < w.length; j++) { s = (s + w[j]) | 0; x ^= w[j]; }
+	if (s !== h.sum || x !== h.xor) return { ok: false, note: "checksum" };
+	var out = {};
+	for (var t = 0; t < h.tables.length; t++) {
+		var d = h.tables[t];
+		var C = d.dtype === "u8" ? Uint8Array : (d.dtype === "u16" ? Uint16Array : Int32Array);
+		var v = new C(buf, data + d.offset, d.length);
+		if (d.kind === "int32array") { out[d.name] = v; continue; }
+		if (d.cols === 0) {
+			var a1 = new Array(d.length);
+			for (var k = 0; k < d.length; k++) a1[k] = v[k];
+			out[d.name] = a1;
+		} else {
+			var a2 = new Array(d.rows);
+			for (var r = 0, p = 0; r < d.rows; r++) {
+				var row = new Array(d.cols);
+				for (var c = 0; c < d.cols; c++) row[c] = v[p++];
+				a2[r] = row;
+			}
+			out[d.name] = a2;
+		}
+	}
+	function dec(z) {
+		if (z === null || typeof z !== "object") return z;
+		var a = new Array(z.a);
+		for (var q = 0; q < z.e.length; q++) a[z.e[q][0]] = dec(z.e[q][1]);
+		return a;
+	}
+	for (var sn in h.small) out[sn] = dec(h.small[sn]);
+	return { ok: true, tables: out, note: "ok" };
+}
+
 WorkerScript.onMessage = function(msg) {
 	if (msg.cmd === "seed") {
 		WcaScramble.seed(msg.seed);
 		return;
 	}
 	if (msg.cmd === "tables") {
-		// Shipped 4x4 Edge3Prun table (saves ~21 s of the first 4x4 scramble). Checked before use;
-		// on any problem the worker silently falls back to computing it.
+		// Shipped 4x4 tables (saves ~28 s of the first 4x4 scramble). Checked before use; on any
+		// problem the worker silently falls back to computing them.
 		var t0 = Date.now(), note = "";
 		try {
-			var x = new XMLHttpRequest();
-			x.open("GET", msg.url, false);
-			x.responseType = "arraybuffer";
-			x.send();
-			var buf = x.response;
-			var a = (buf && buf.byteLength === 7751520) ? new Int32Array(buf) : null;
-			var s = 0, xr = 0;
-			if (a) for (var i = 0; i < a.length; i++) { s = (s + a[i]) | 0; xr ^= a[i]; }
-			if (a && s === -1302533572 && xr === -1754566360) { scramble_444.setEdge3Prun(a); note = "ok"; }
-			else note = "rejected (" + (buf ? buf.byteLength : "no data") + " bytes)";
+			var xh = new XMLHttpRequest();
+			xh.open("GET", msg.url, false);
+			xh.responseType = "arraybuffer";
+			xh.send();
+			var res = xh.response ? parseTables444(xh.response) : { ok: false, note: "no data" };
+			if (res.ok) scramble_444.setTables(res.tables);
+			note = res.note;
 		} catch (e) { note = "error " + e; }
 		WorkerScript.sendMessage({ cmd: "tables", note: note, ms: Date.now() - t0 });
 		return;
