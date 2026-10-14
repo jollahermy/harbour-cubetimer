@@ -5,6 +5,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QStringList>
 #include <chrono>
+#include <vector>
 
 namespace {
 const QEvent::Type ReplyEventType = static_cast<QEvent::Type>(QEvent::User + 731);
@@ -59,10 +60,22 @@ void NativeScrambler::run()
     ct::Scrambler s;
     // Kernel entropy (passed from main) plus the clock, so two instances never share a stream.
     s.seed(seed_ + "|" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    // Idle warm-up: build each puzzle's tables ahead of time (one discarded scramble per event),
+    // but only while no request is waiting, so the first real scramble is never delayed by it.
+    std::vector<std::string> warm;
+    for (const char *e : { "333", "444", "sq1", "222", "skewb", "pyram" })
+        if (ct::Scrambler::supported(e))
+            warm.push_back(e);
+    size_t warmed = 0;
     for (;;) {
         Req r;
         {
             std::unique_lock<std::mutex> l(mu_);
+            if (warmed < warm.size() && queue_.empty() && !stop_) {
+                l.unlock();
+                s.generate(warm[warmed++]);
+                continue;
+            }
             cv_.wait(l, [this] { return stop_ || !queue_.empty(); });
             if (stop_)
                 return;
