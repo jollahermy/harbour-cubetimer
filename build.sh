@@ -6,8 +6,8 @@ cd "$(dirname "$0")/src"
 export PATH=$S/usr/bin:$PATH LD_LIBRARY_PATH=$S/usr/lib64:/usr/lib64
 INC="-isystem $S/usr/include/sailfishapp -isystem $S/usr/include/qt5 -isystem $S/usr/include/qt5/QtCore -isystem $S/usr/include/qt5/QtGui -isystem $S/usr/include/qt5/QtQml -isystem $S/usr/include/qt5/QtQuick"   # -isystem: no warnings from Qt headers
 OBJ=""
-# Only modules that passed test/native_diff.sh go into the app; s333 is a stub until verified.
-MODULES="${MODULES:-scramble/rng.cpp scramble/scramble.cpp scramble/s222.cpp scramble/spyr.cpp scramble/sskb.cpp scramble/ssq1.cpp scramble/s333_stub.cpp}"
+# Only modules that passed test/native_diff.sh go into the app.
+MODULES="${MODULES:-scramble/rng.cpp scramble/scramble.cpp scramble/s333.cpp scramble/s222.cpp scramble/spyr.cpp scramble/sskb.cpp scramble/ssq1.cpp}"
 for f in main.cpp nativescrambler.cpp $MODULES; do
   o="../build/$(echo $f | tr / _ | sed 's/\.cpp$/.o/')"
   mkdir -p ../build
