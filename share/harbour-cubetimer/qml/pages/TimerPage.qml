@@ -806,10 +806,12 @@ Page {
         if (!statsExpanded) {
             statsExpanded = true;
         } else {
-            // Labels column: a tap collapses on release. Anything else in the table is never a solve:
-            // history columns open their popup from their own MouseArea (inside the Flickable).
+            // Labels column and the best column: a tap collapses on release. Anything else in the
+            // table is never a solve: history columns open their popup from their own MouseArea
+            // (inside the Flickable).
             var lp = touch.mapToItem(statsLabels, x, y);
-            if (lp.x >= 0 && lp.x <= statsLabels.width) tableTapPending = true;
+            var bp = touch.mapToItem(bestCol, x, y);
+            if ((lp.x >= 0 && lp.x <= statsLabels.width) || (bp.x >= 0 && bp.x <= bestCol.width)) tableTapPending = true;
             tablePressX = x;
             tablePressY = y;
         }
