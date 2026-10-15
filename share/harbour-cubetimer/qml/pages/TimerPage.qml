@@ -163,6 +163,11 @@ Page {
     property real lastStopMs: -100000
 
     readonly property int readyDelayMs: 550          // hold time before green
+    // Red (not ready) phase: finger drift up to holdSlop keeps the hold; more = a drag (cancel).
+    readonly property real holdSlop: (Theme.startDragDistance || 15) * 3
+    property real holdPressX: 0
+    property real holdPressY: 0
+    property bool holdDrifted: false
     readonly property int cooldownMs: 300            // ignore touches after stop
     // Hold feedback colours (red = not ready, green = ready) are fixed; everything else is Theme.
     readonly property color notReadyColor: "#ff7b84"
@@ -905,12 +910,23 @@ Page {
                 // Keep the grab only once the hold is ready (green) or the solve is running:
                 // before ready, a drag may still go to the page flickable (PullDownMenu) and
                 // cancel the hold; after ready, finger drift can no longer cancel it.
-                preventStealing: (page.phase === "holding" && page.ready) || page.phase === "running"
+                // Red phase: also keep it while the finger stays within holdSlop, so a small
+                // wobble does not cancel; past that the hold is cancelled and the drag is free.
+                preventStealing: (page.phase === "holding" && (page.ready || !page.holdDrifted)) || page.phase === "running"
                 onPressed: {
+                    page.holdPressX = mouse.x;
+                    page.holdPressY = mouse.y;
+                    page.holdDrifted = false;
                     if (page.statsPress(mouse.x, mouse.y) === "consume") return;
                     page.onPress();
                 }
                 onPositionChanged: {
+                    if (page.phase === "holding" && !page.ready && !page.holdDrifted
+                            && (Math.abs(mouse.x - page.holdPressX) > page.holdSlop
+                                || Math.abs(mouse.y - page.holdPressY) > page.holdSlop)) {
+                        page.holdDrifted = true;
+                        page.cancelHold();
+                    }
                     if (!page.tableTapPending) return;
                     var slop = Theme.startDragDistance || 15;
                     if (Math.abs(mouse.x - page.tablePressX) >= slop || Math.abs(mouse.y - page.tablePressY) >= slop) {
