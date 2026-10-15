@@ -135,3 +135,30 @@ function widthProbeText(rows) {
 function computeStats(solves) {
     return { ao5: aoText(solves, 5), ao12: aoText(solves, 12), ao100: aoText(solves, 100) };
 }
+
+// Session bests as display strings: {time, ao5, ao12, ao100}. time = the best single
+// (solveText, so a +2 best shows "12.34+"); DNF singles never count. aoN = the lowest aoN over
+// every window (DNF averages never count). "-" when there is nothing to show (e.g. all DNF).
+function bestStats(solves) {
+    var out = { time: "-", ao5: "-", ao12: "-", ao100: "-" };
+    if (!solves || solves.length === 0) return out;
+    var best = Infinity, bestIdx = -1;
+    for (var i = 0; i < solves.length; i++) {
+        var v = effectiveMs(solves[i]);
+        if (v < best) { best = v; bestIdx = i; }
+    }
+    if (bestIdx >= 0) out.time = solveText(solves[bestIdx]);
+    var WINS = [5, 12, 100], KEYS = ["ao5", "ao12", "ao100"];
+    for (var w = 0; w < WINS.length; w++) {
+        var n = WINS[w], a = [], vals = [], m = Infinity;
+        for (var j = 0; j < solves.length; j++) {
+            var x = effectiveMs(solves[j]);
+            vals.push(x);
+            a.splice(lowerBound(a, x), 0, x);
+            if (j >= n) a.splice(lowerBound(a, vals[j - n]), 1);
+            if (j + 1 >= n) m = Math.min(m, aoFromSorted(a, n));
+        }
+        if (m !== Infinity) out[KEYS[w]] = fmtMs(m);
+    }
+    return out;
+}

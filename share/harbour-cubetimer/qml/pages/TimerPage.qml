@@ -74,6 +74,8 @@ Page {
     // Latest solve of the session ("time" row) and per-solve history (expanded table).
     readonly property string latestText: Stats.solveText(lastSolve)
     readonly property var history: Stats.rollingAverages(sessionSolves)
+    // Session bests (single + best ao5/12/100), shown as the pinned right column of the open table.
+    readonly property var bests: Stats.bestStats(sessionSolves)
     // Stats block: collapsed (labels | latest values) or expanded to a history table.
     // expandT animates 0 -> 1 (200 ms, OutCubic) and drives width, header height and fades.
     property bool statsExpanded: false
@@ -87,6 +89,7 @@ Page {
     readonly property real statsRowH: Math.round(Theme.fontSizeExtraSmall * 1.5)
     readonly property real histHeaderH: Math.round(Theme.fontSizeTiny * 1.6)
     readonly property real histColW: pHist.implicitWidth + Theme.paddingLarge
+    readonly property real bestColW: Math.max(pBest.implicitWidth, pBestHead.implicitWidth) + Theme.paddingLarge
     // Shown instead of the history when the session has no solves (one '-' column, no popup).
     readonly property var emptyHist: [{ n: "-", time: "-", ao5: "-", ao12: "-", ao100: "-" }]
     onExpandTChanged: if (statsExpanded) scrollHistToNewest();
@@ -175,6 +178,7 @@ Page {
     readonly property color dimColor: Theme.secondaryColor
     readonly property color accentColor: Theme.highlightColor       // pressed, current item, '+', copy flash
     readonly property color lavenderColor: Theme.secondaryColor     // secondary text: session name, labels, arrows
+    readonly property color bestColor: Theme.highlightColor         // session bests column (stands out)
     readonly property color textColor: Theme.primaryColor           // primary text: event title, times, list names
     // Raised surfaces: drop-down lists, the solve popup card, the row under a drop-down.
     readonly property color panelColor: Theme.rgba(Theme.highlightDimmerColor, 0.9)
@@ -1252,6 +1256,8 @@ Page {
         Text { id: pv12;  visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: page.stats.ao12 }
         Text { id: pv100; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: page.stats.ao100 }
         Text { id: pHist; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; text: Stats.widthProbeText(page.history) }
+        Text { id: pBest; visible: false; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; font.bold: true; text: Stats.widthProbeText([page.bests]) }
+        Text { id: pBestHead; visible: false; font.pixelSize: Theme.fontSizeTiny; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeTiny) * page.trackK; font.bold: true; text: "best" }
         // Drop-down name probes: the widest event / session name sets the minimum list width.
         Text { id: eventNameProbe;   visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: page.widestName(page.events) }
         Text { id: sessionNameProbe; visible: false; font.pixelSize: Theme.fontSizeLarge; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeLarge) * page.trackK; text: page.widestName(page.sessionMenuItems) }
@@ -1272,7 +1278,7 @@ Page {
         }
 
         // Stats block, bottom-right. Collapsed: [labels | time, ao5, ao12, ao100 of the latest solve].
-        // Tap it to expand leftward: [labels | per-solve columns, newest at the right edge].
+        // Tap it to expand leftward: [labels | per-solve columns, newest at the right | session bests].
         // Opacity follows the scramble (dim while holding, hidden while running). Presses are
         // routed by the touch area (page.statsPress); the table rect never starts a solve.
         Item {
@@ -1316,13 +1322,29 @@ Page {
             // Expanded history: one column per solve of the session, oldest at the left.
             // Scrolls horizontally; starts at the newest column (right edge). The outer
             // flickable is locked while this one moves, so a horizontal drag cannot pull down.
+            // Expanded only: session bests, pinned at the right edge in the accent colour.
+            Column {
+                id: bestCol
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                width: page.bestColW
+                visible: page.expandT > 0
+                opacity: page.expandT
+                Label { width: parent.width; height: page.histHeaderH; text: "best"; color: page.bestColor; font.bold: true; font.pixelSize: Theme.fontSizeTiny; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeTiny) * page.trackK; horizontalAlignment: Text.AlignRight }
+                Label { width: parent.width; height: page.statsRowH; text: page.bests.time; color: page.bestColor; font.bold: true; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                Label { width: parent.width; height: page.statsRowH; text: page.bests.ao5; color: page.bestColor; font.bold: true; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                Label { width: parent.width; height: page.statsRowH; text: page.bests.ao12; color: page.bestColor; font.bold: true; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                Label { width: parent.width; height: page.statsRowH; text: page.bests.ao100; color: page.bestColor; font.bold: true; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+            }
+
             Flickable {
                 id: histFlick
                 anchors.left: statsLabels.right
                 anchors.leftMargin: Theme.paddingLarge
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                anchors.right: parent.right
+                anchors.right: bestCol.left
+                anchors.rightMargin: Theme.paddingSmall
                 visible: page.expandT > 0
                 opacity: page.expandT
                 clip: true
