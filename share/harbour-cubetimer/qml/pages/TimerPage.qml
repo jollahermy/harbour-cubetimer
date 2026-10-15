@@ -866,16 +866,16 @@ Page {
             MenuItem {
 
                 font.family: page.appFont; font.letterSpacing: Theme.fontSizeMedium * page.trackK
-                text: "Delete"
+                text: "OK"
                 enabled: page.canEditLast
-                onClicked: page.deleteSolve()
+                onClicked: page.clearPenalty()
             }
             MenuItem {
 
                 font.family: page.appFont; font.letterSpacing: Theme.fontSizeMedium * page.trackK
-                text: "OK"
+                text: "Delete"
                 enabled: page.canEditLast
-                onClicked: page.clearPenalty()
+                onClicked: page.deleteSolve()
             }
             MenuItem {
 
