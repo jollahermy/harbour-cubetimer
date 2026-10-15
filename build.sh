@@ -11,7 +11,7 @@ MODULES="${MODULES:-scramble/rng.cpp scramble/scramble.cpp scramble/s333.cpp scr
 for f in main.cpp nativescrambler.cpp $MODULES; do
   o="../build/$(echo $f | tr / _ | sed 's/\.cpp$/.o/')"
   mkdir -p ../build
-  g++ --sysroot=$S -B$S/usr/bin/ -std=gnu++11 -O2 -Wall -Wextra -fPIC -pthread $INC -c $f -o $o
+  g++ --sysroot=$S -B$S/usr/bin/ -std=gnu++11 -O2 -DQT_NO_DEBUG -Wall -Wextra -fPIC -pthread $INC -c $f -o $o
   OBJ="$OBJ $o"
 done
 mkdir -p ../bin

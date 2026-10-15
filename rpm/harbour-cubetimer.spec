@@ -15,7 +15,7 @@
 
 Name:       harbour-cubetimer
 Summary:    Rubik's cube speedsolving timer
-Version:    1.7
+Version:    1.8
 Release:    1
 License:    GPLv3
 Group:      Qt/Qt
