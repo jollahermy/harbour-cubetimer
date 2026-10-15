@@ -733,6 +733,7 @@ Page {
         appendSolve(s);
         scrambleAfterSolve();
         noFade = false;
+        if (lastIsPb) { pbPop.restart(); confetti.burst(); }   // new PB: celebrate (only here)
     }
 
     // ---- solve detail popup (tap a history column) ----------------------
@@ -1471,6 +1472,8 @@ Page {
         // "PB" under the time (under the penalty line when there is one) while idle, when the
         // last solve is a new best single of the session. Same accent colour as the best column.
         Label {
+            id: pbLabel
+            z: 4                                   // above the confetti (z 3), stays readable
             anchors.top: page.subText !== "" ? penaltyLabel.bottom : timeLabel.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             visible: page.lastIsPb && page.phase === "idle"
@@ -1478,6 +1481,55 @@ Page {
             color: page.bestColor
             font.bold: true
             font.pixelSize: page.penaltySize; font.family: page.appFont; font.letterSpacing: (page.penaltySize) * page.trackK
+        }
+
+        // PB celebration (only right after a solve that is a new PB, see stopSolve): a confetti
+        // burst from the PB label plus a pop of the label. One animated value (burstT 0 -> 1)
+        // drives every piece; each piece gets a random angle / distance / spin per burst.
+        Item {
+            id: confetti
+            z: 3
+            x: pbLabel.x + pbLabel.width / 2
+            y: pbLabel.y + pbLabel.height / 2
+            width: 0; height: 0
+            property real burstT: 1
+            visible: burstT < 1
+            readonly property var palette: [page.bestColor, page.readyColor, "#ffd36e", "#ff9ad5", "#ffffff"]
+            function burst() {
+                for (var i = 0; i < pieces.count; i++) {
+                    var p = pieces.itemAt(i);
+                    if (!p) continue;
+                    p.a = -Math.PI * (0.08 + 0.84 * Math.random());          // mostly upwards fan
+                    p.d = Theme.itemSizeLarge * (1.4 + 1.6 * Math.random());
+                    p.spin = (Math.random() < 0.5 ? -1 : 1) * (180 + 360 * Math.random());
+                    p.c = palette[i % palette.length];
+                }
+                burstAnim.restart();
+            }
+            Repeater {
+                id: pieces
+                model: 18
+                Rectangle {
+                    property real a: 0
+                    property real d: 0
+                    property real spin: 0
+                    property color c: "white"
+                    readonly property real t: confetti.burstT
+                    width: Theme.paddingMedium * (index % 3 === 0 ? 1.4 : 1); height: Theme.paddingSmall * 1.6
+                    radius: height / 3
+                    color: c
+                    x: Math.cos(a) * d * t - width / 2
+                    y: Math.sin(a) * d * t + Theme.itemSizeLarge * 1.2 * t * t - height / 2   // + gravity
+                    rotation: spin * t
+                    opacity: 1 - t * t
+                }
+            }
+            NumberAnimation { id: burstAnim; target: confetti; property: "burstT"; from: 0; to: 1; duration: 900; easing.type: Easing.OutQuad }
+        }
+        SequentialAnimation {
+            id: pbPop
+            NumberAnimation { target: pbLabel; property: "scale"; from: 0.4; to: 1.25; duration: 220; easing.type: Easing.OutBack }
+            NumberAnimation { target: pbLabel; property: "scale"; to: 1; duration: 200; easing.type: Easing.InOutQuad }
         }
 
         // Event drop-down: opens right under the event row. Full-width rows, centred names,
@@ -1808,8 +1860,8 @@ Page {
         }
     }
 
-    // ---- stop feedback: a soft ripple from the finger + a short pop of the time -----------
-    // Visual only (never takes input). ~300 ms, so it is over before the next hold can start.
+    // ---- stop feedback: a faint ripple from the finger -----------------------------------
+    // Visual only (never takes input). ~350 ms, so it is over before the next hold can start.
     Item {
         id: stopRipple
         z: 14
@@ -1820,25 +1872,21 @@ Page {
             width: 2 * stopRipple.r; height: width; radius: stopRipple.r
             color: "transparent"
             border.width: Theme.paddingSmall
-            border.color: Theme.rgba(page.textColor, 0.5)
+            border.color: Theme.rgba(page.textColor, 0.25)
             opacity: 0
             id: rippleRing
         }
         Rectangle {
             x: -stopRipple.r; y: -stopRipple.r
             width: 2 * stopRipple.r; height: width; radius: stopRipple.r
-            color: Theme.rgba(page.textColor, 0.10)
+            color: Theme.rgba(page.textColor, 0.05)
             opacity: rippleRing.opacity
         }
     }
     ParallelAnimation {
         id: stopFeedback
-        NumberAnimation { target: stopRipple; property: "r"; from: Theme.paddingLarge; to: Theme.itemSizeHuge * 1.6; duration: 320; easing.type: Easing.OutCubic }
-        NumberAnimation { target: rippleRing; property: "opacity"; from: 1; to: 0; duration: 320; easing.type: Easing.InQuad }
-        SequentialAnimation {
-            NumberAnimation { target: timeLabel; property: "scale"; from: 1; to: 1.06; duration: 90; easing.type: Easing.OutQuad }
-            NumberAnimation { target: timeLabel; property: "scale"; to: 1; duration: 180; easing.type: Easing.InOutQuad }
-        }
+        NumberAnimation { target: stopRipple; property: "r"; from: Theme.paddingLarge; to: Theme.itemSizeHuge * 1.6; duration: 350; easing.type: Easing.OutCubic }
+        NumberAnimation { target: rippleRing; property: "opacity"; from: 1; to: 0; duration: 350; easing.type: Easing.InQuad }
     }
 
     // ---- rename input blocker (only while renaming a session) -------------
