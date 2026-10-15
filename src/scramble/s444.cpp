@@ -1172,6 +1172,19 @@ Tables::Tables()
     initCenter3();
     initEdge3();
     initEdge3Prun();
+    // Release build-time scratch: these members are written during the init
+    // passes above and never read at scramble time (verified: every use is
+    // inside initCenter1/initCenter2/initEdge3/initEdge3Prun).
+    //   rlrot/ctrot           ~0.40 MB (ctrot 6435x16 int)
+    //   Edge3SymMove          ~0.12 MB (20 x vector<int>(1538))
+    //   Center1RotPerm        ~4.6 KB (stack-sized, kept for clarity)
+    //   symstate              ~6 KB
+    // clear()+shrink_to_fit() returns the >=128 KB blocks to the allocator
+    // (mmap'd -> munmap'd); the rest becomes reusable heap.
+    rlrot.clear(); rlrot.shrink_to_fit();
+    ctrot.clear(); ctrot.shrink_to_fit();
+    for (auto &v : Edge3SymMove) { v.clear(); v.shrink_to_fit(); }
+    symstate.clear(); symstate.shrink_to_fit();
 }
 
 const Tables &T()

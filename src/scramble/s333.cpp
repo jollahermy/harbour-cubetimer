@@ -369,6 +369,13 @@ void Tables::initSym2Raw(int nRaw, vector<int> &sym2raw, vector<int> &raw2sym, v
     }
     sym2raw.resize(count);
     selfSym.resize(count);
+    // Drop the over-reserved capacity: both were assign()ed at full raw size
+    // (nRaw) but only count (= N_*_SYM) entries are ever used. EPermS2R and
+    // PermSelfSym were holding 40320 ints of capacity for 2768 used
+    // (~0.15 MB each). raw2sym keeps its full size: it is indexed by the raw
+    // coordinate at scramble time (getFlipSym/getTwstSym/getEPermSym).
+    sym2raw.shrink_to_fit();
+    selfSym.shrink_to_fit();
 }
 
 int Tables::initRawSymPrun(vector<uint32_t> &prun, int nRaw, int nSym, const vector<int> *rawMove,
