@@ -14,6 +14,7 @@ for f in main.cpp nativescrambler.cpp $MODULES; do
   g++ --sysroot=$S -B$S/usr/bin/ -std=gnu++11 -O2 -Wall -Wextra -fPIC -pthread $INC -c $f -o $o
   OBJ="$OBJ $o"
 done
+mkdir -p ../bin
 g++ --sysroot=$S -B$S/usr/bin/ -pthread -o ../bin/harbour-cubetimer $OBJ -L/usr/lib64 -lsailfishapp -lQt5Quick -lQt5Qml -lQt5Gui -lQt5Core -Wl,-rpath,/usr/lib64
 chown $(stat -c %u:%g main.cpp) ../bin/harbour-cubetimer
 ls -la ../bin/harbour-cubetimer
