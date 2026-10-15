@@ -185,3 +185,25 @@ function bestSingleIndex(solves) {
     }
     return idx;
 }
+
+// End index of the session's best aoN window for N = 5, 12, 100: {ao5, ao12, ao100}, -1 when
+// there is no valid (non-DNF) aoN. Earliest on a tie. Same values as bestStats(); used to
+// colour those cells in the history table.
+function bestAoIndices(solves) {
+    var out = { ao5: -1, ao12: -1, ao100: -1 };
+    var WINS = [5, 12, 100], KEYS = ["ao5", "ao12", "ao100"];
+    for (var w = 0; w < WINS.length; w++) {
+        var n = WINS[w], a = [], vals = [], m = Infinity;
+        for (var j = 0; solves && j < solves.length; j++) {
+            var x = effectiveMs(solves[j]);
+            vals.push(x);
+            a.splice(lowerBound(a, x), 0, x);
+            if (j >= n) a.splice(lowerBound(a, vals[j - n]), 1);
+            if (j + 1 >= n) {
+                var v = aoFromSorted(a, n);
+                if (v < m) { m = v; out[KEYS[w]] = j; }
+            }
+        }
+    }
+    return out;
+}
