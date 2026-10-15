@@ -1854,46 +1854,49 @@ Page {
         visible: enabled
         onPressed: {
             page.stopSolve(Date.now());
-            stopRipple.center = Qt.point(mouse.x, mouse.y);
+            stopRipple.cx = mouse.x;
+            stopRipple.cy = mouse.y;
             stopFeedback.restart();
         }
     }
 
-    // ---- stop feedback: a soft, blurred ring spreading from the finger over the whole screen ----
-    // Like the hold highlight's soft edge: no hard line, a Gaussian band (ShaderEffect) whose
-    // radius grows to the farthest corner while it fades. Visual only (never takes input);
-    // only visible while animating (~250 ms), so the shader costs nothing when idle.
+    // ---- stop feedback: a soft, blurred ring spreading from the finger ----------------------
+    // Like the hold highlight's soft edge: no hard line, a Gaussian band (ShaderEffect). The
+    // effect item is a SQUARE centred on the touch point and the shader works in its own unit
+    // square, so the ring is always a perfect circle. It grows to rEnd (not the whole screen)
+    // while fading out over the same time. Visual only (never takes input); visible only while
+    // animating, so the shader costs nothing when idle.
     ShaderEffect {
         id: stopRipple
         z: 14
-        anchors.fill: parent
+        property real rEnd: page.width * 0.45                    // final ring radius (px)
+        property real w: Theme.itemSizeMedium                     // soft band half-width (px)
+        property real half: rEnd + 3 * w                          // square half-size: band fits
+        property real cx: 0
+        property real cy: 0
+        x: cx - half; y: cy - half
+        width: 2 * half; height: 2 * half
         visible: stopFeedback.running
-        property point center: Qt.point(0, 0)
-        property real r: 0
-        property real w: Theme.itemSizeLarge                       // soft band half-width (blur)
-        property size area: Qt.size(width, height)
-        property color col: Theme.rgba(page.textColor, 0.16)
-        // Radius that reaches the farthest screen corner (+ the band) from the touch point.
-        readonly property real rMax: Math.sqrt(Math.pow(Math.max(center.x, width - center.x), 2) +
-                                               Math.pow(Math.max(center.y, height - center.y), 2)) + w
+        property real r: 0                                        // current radius (px)
+        property real rN: r / (2 * half)                          // shader units (side = 1)
+        property real wN: w / (2 * half)
+        property color col: Theme.rgba(page.textColor, 0.10)
         fragmentShader: "
             varying highp vec2 qt_TexCoord0;
             uniform lowp float qt_Opacity;
-            uniform highp vec2 center;
-            uniform highp float r;
-            uniform highp float w;
-            uniform highp vec2 area;
+            uniform highp float rN;
+            uniform highp float wN;
             uniform lowp vec4 col;
             void main() {
-                highp float d = distance(qt_TexCoord0 * area, center);
-                highp float k = (d - r) / w;
+                highp float d = distance(qt_TexCoord0, vec2(0.5, 0.5));
+                highp float k = (d - rN) / wN;
                 gl_FragColor = col * exp(-k * k) * qt_Opacity;
             }"
     }
     ParallelAnimation {
         id: stopFeedback
-        NumberAnimation { target: stopRipple; property: "r"; from: 0; to: stopRipple.rMax; duration: 250; easing.type: Easing.OutQuad }
-        NumberAnimation { target: stopRipple; property: "opacity"; from: 1; to: 0; duration: 250; easing.type: Easing.InQuad }
+        NumberAnimation { target: stopRipple; property: "r"; from: 0; to: stopRipple.rEnd; duration: 380; easing.type: Easing.OutQuad }
+        NumberAnimation { target: stopRipple; property: "opacity"; from: 1; to: 0; duration: 380; easing.type: Easing.Linear }
     }
 
     // ---- rename input blocker (only while renaming a session) -------------
