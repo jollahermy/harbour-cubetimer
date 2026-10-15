@@ -1800,7 +1800,45 @@ Page {
         z: 15
         enabled: page.phase === "running"
         visible: enabled
-        onPressed: page.stopSolve(Date.now())
+        onPressed: {
+            page.stopSolve(Date.now());
+            stopRipple.x = mouse.x;
+            stopRipple.y = mouse.y;
+            stopFeedback.restart();
+        }
+    }
+
+    // ---- stop feedback: a soft ripple from the finger + a short pop of the time -----------
+    // Visual only (never takes input). ~300 ms, so it is over before the next hold can start.
+    Item {
+        id: stopRipple
+        z: 14
+        width: 0; height: 0
+        property real r: 0
+        Rectangle {
+            x: -stopRipple.r; y: -stopRipple.r
+            width: 2 * stopRipple.r; height: width; radius: stopRipple.r
+            color: "transparent"
+            border.width: Theme.paddingSmall
+            border.color: Theme.rgba(page.textColor, 0.5)
+            opacity: 0
+            id: rippleRing
+        }
+        Rectangle {
+            x: -stopRipple.r; y: -stopRipple.r
+            width: 2 * stopRipple.r; height: width; radius: stopRipple.r
+            color: Theme.rgba(page.textColor, 0.10)
+            opacity: rippleRing.opacity
+        }
+    }
+    ParallelAnimation {
+        id: stopFeedback
+        NumberAnimation { target: stopRipple; property: "r"; from: Theme.paddingLarge; to: Theme.itemSizeHuge * 1.6; duration: 320; easing.type: Easing.OutCubic }
+        NumberAnimation { target: rippleRing; property: "opacity"; from: 1; to: 0; duration: 320; easing.type: Easing.InQuad }
+        SequentialAnimation {
+            NumberAnimation { target: timeLabel; property: "scale"; from: 1; to: 1.06; duration: 90; easing.type: Easing.OutQuad }
+            NumberAnimation { target: timeLabel; property: "scale"; to: 1; duration: 180; easing.type: Easing.InOutQuad }
+        }
     }
 
     // ---- rename input blocker (only while renaming a session) -------------
