@@ -78,6 +78,8 @@ Page {
     readonly property var bests: Stats.bestStats(sessionSolves)
     // The last solve is a new best single of this session (shown as "PB" under the time).
     readonly property bool lastIsPb: Stats.isNewBestSingle(sessionSolves)
+    // Index of the session's best single: its time cell in the history table uses bestColor.
+    readonly property int bestSingleIdx: Stats.bestSingleIndex(sessionSolves)
     // Stats block: collapsed (labels | latest values) or expanded to a history table.
     // expandT animates 0 -> 1 (200 ms, OutCubic) and drives width, header height and fades.
     property bool statsExpanded: false
@@ -91,7 +93,7 @@ Page {
     readonly property real statsRowH: Math.round(Theme.fontSizeExtraSmall * 1.5)
     readonly property real histHeaderH: Math.round(Theme.fontSizeTiny * 1.6)
     readonly property real histColW: pHist.implicitWidth + Theme.paddingLarge
-    readonly property real bestColW: Math.max(pBest.implicitWidth, pBestHead.implicitWidth) + Theme.paddingLarge
+    readonly property real bestColW: Math.max(pBest.implicitWidth, pBestHead.implicitWidth) + Theme.paddingLarge - Theme.paddingMedium   // gap to #N = gap between history columns
     // Shown instead of the history when the session has no solves (one '-' column, no popup).
     readonly property var emptyHist: [{ n: "-", time: "-", ao5: "-", ao12: "-", ao100: "-" }]
     onExpandTChanged: if (statsExpanded) scrollHistToNewest();
@@ -1347,7 +1349,7 @@ Page {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 anchors.right: bestCol.left
-                anchors.rightMargin: Theme.paddingSmall
+                anchors.rightMargin: 0
                 visible: page.expandT > 0
                 opacity: page.expandT
                 clip: true
@@ -1392,7 +1394,7 @@ Page {
                                 anchors.right: parent.right
                                 width: page.histColW
                                 Label { width: parent.width - Theme.paddingMedium; height: page.histHeaderH; text: "#" + modelData.n; color: page.lavenderColor; font.pixelSize: Theme.fontSizeTiny; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeTiny) * page.trackK; horizontalAlignment: Text.AlignRight }
-                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.time; color: page.textColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
+                                Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.time; color: (page.history.length > 0 && index === page.bestSingleIdx) ? page.bestColor : page.lavenderColor; font.bold: page.history.length > 0 && index === page.bestSingleIdx; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
                                 Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao5; color: page.lavenderColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
                                 Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao12; color: page.lavenderColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }
                                 Label { width: parent.width - Theme.paddingMedium; height: page.statsRowH; text: modelData.ao100; color: page.lavenderColor; font.pixelSize: Theme.fontSizeExtraSmall; font.family: page.appFont; font.letterSpacing: (Theme.fontSizeExtraSmall) * page.trackK; horizontalAlignment: Text.AlignRight; elide: Text.ElideLeft }

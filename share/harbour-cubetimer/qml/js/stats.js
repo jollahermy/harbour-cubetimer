@@ -174,3 +174,14 @@ function isNewBestSingle(solves) {
         if (effectiveMs(solves[i]) <= last) return false;
     return true;
 }
+
+// Index of the session's best single (earliest on a tie, DNF never), or -1. Same pick as
+// bestStats().time, used to colour that cell in the history table.
+function bestSingleIndex(solves) {
+    var best = Infinity, idx = -1;
+    for (var i = 0; solves && i < solves.length; i++) {
+        var v = effectiveMs(solves[i]);
+        if (v < best) { best = v; idx = i; }
+    }
+    return idx;
+}
