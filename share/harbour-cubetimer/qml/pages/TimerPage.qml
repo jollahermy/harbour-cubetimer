@@ -76,6 +76,8 @@ Page {
     readonly property var history: Stats.rollingAverages(sessionSolves)
     // Session bests (single + best ao5/12/100), shown as the pinned right column of the open table.
     readonly property var bests: Stats.bestStats(sessionSolves)
+    // The last solve is a new best single of this session (shown as "PB" under the time).
+    readonly property bool lastIsPb: Stats.isNewBestSingle(sessionSolves)
     // Stats block: collapsed (labels | latest values) or expanded to a history table.
     // expandT animates 0 -> 1 (200 ms, OutCubic) and drives width, header height and fades.
     property bool statsExpanded: false
@@ -1454,6 +1456,7 @@ Page {
 
         // Penalty line under the big time: DNF raw time or +2 total.
         Label {
+            id: penaltyLabel
             anchors.top: timeLabel.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             width: page.width - 2 * Theme.paddingMedium
@@ -1462,6 +1465,18 @@ Page {
             minimumPixelSize: Theme.fontSizeTiny
             text: page.subText
             color: page.dimColor
+            font.pixelSize: page.penaltySize; font.family: page.appFont; font.letterSpacing: (page.penaltySize) * page.trackK
+        }
+
+        // "PB" under the time (under the penalty line when there is one) while idle, when the
+        // last solve is a new best single of the session. Same accent colour as the best column.
+        Label {
+            anchors.top: page.subText !== "" ? penaltyLabel.bottom : timeLabel.bottom
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: page.lastIsPb && page.phase === "idle"
+            text: "PB"
+            color: page.bestColor
+            font.bold: true
             font.pixelSize: page.penaltySize; font.family: page.appFont; font.letterSpacing: (page.penaltySize) * page.trackK
         }
 

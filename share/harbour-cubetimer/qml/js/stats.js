@@ -162,3 +162,15 @@ function bestStats(solves) {
     }
     return out;
 }
+
+// True when the last solve is a new best single of the session: strictly faster (effective
+// time, +2 included) than every earlier solve. Needs at least one earlier solve; a DNF is never a
+// PB; earlier DNFs do not count. Derived from the data, so a later +2/DNF/delete updates it.
+function isNewBestSingle(solves) {
+    if (!solves || solves.length < 2) return false;
+    var last = effectiveMs(solves[solves.length - 1]);
+    if (last === Infinity) return false;
+    for (var i = 0; i < solves.length - 1; i++)
+        if (effectiveMs(solves[i]) <= last) return false;
+    return true;
+}
