@@ -1854,39 +1854,46 @@ Page {
         visible: enabled
         onPressed: {
             page.stopSolve(Date.now());
-            stopRipple.x = mouse.x;
-            stopRipple.y = mouse.y;
+            stopRipple.center = Qt.point(mouse.x, mouse.y);
             stopFeedback.restart();
         }
     }
 
-    // ---- stop feedback: a faint ripple from the finger -----------------------------------
-    // Visual only (never takes input). ~350 ms, so it is over before the next hold can start.
-    Item {
+    // ---- stop feedback: a soft, blurred ring spreading from the finger over the whole screen ----
+    // Like the hold highlight's soft edge: no hard line, a Gaussian band (ShaderEffect) whose
+    // radius grows to the farthest corner while it fades. Visual only (never takes input);
+    // only visible while animating (~250 ms), so the shader costs nothing when idle.
+    ShaderEffect {
         id: stopRipple
         z: 14
-        width: 0; height: 0
+        anchors.fill: parent
+        visible: stopFeedback.running
+        property point center: Qt.point(0, 0)
         property real r: 0
-        Rectangle {
-            x: -stopRipple.r; y: -stopRipple.r
-            width: 2 * stopRipple.r; height: width; radius: stopRipple.r
-            color: "transparent"
-            border.width: Theme.paddingSmall
-            border.color: Theme.rgba(page.textColor, 0.25)
-            opacity: 0
-            id: rippleRing
-        }
-        Rectangle {
-            x: -stopRipple.r; y: -stopRipple.r
-            width: 2 * stopRipple.r; height: width; radius: stopRipple.r
-            color: Theme.rgba(page.textColor, 0.05)
-            opacity: rippleRing.opacity
-        }
+        property real w: Theme.itemSizeLarge                       // soft band half-width (blur)
+        property size area: Qt.size(width, height)
+        property color col: Theme.rgba(page.textColor, 0.16)
+        // Radius that reaches the farthest screen corner (+ the band) from the touch point.
+        readonly property real rMax: Math.sqrt(Math.pow(Math.max(center.x, width - center.x), 2) +
+                                               Math.pow(Math.max(center.y, height - center.y), 2)) + w
+        fragmentShader: "
+            varying highp vec2 qt_TexCoord0;
+            uniform lowp float qt_Opacity;
+            uniform highp vec2 center;
+            uniform highp float r;
+            uniform highp float w;
+            uniform highp vec2 area;
+            uniform lowp vec4 col;
+            void main() {
+                highp float d = distance(qt_TexCoord0 * area, center);
+                highp float k = (d - r) / w;
+                gl_FragColor = col * exp(-k * k) * qt_Opacity;
+            }"
     }
     ParallelAnimation {
         id: stopFeedback
-        NumberAnimation { target: stopRipple; property: "r"; from: Theme.paddingLarge; to: Theme.itemSizeHuge * 1.6; duration: 350; easing.type: Easing.OutCubic }
-        NumberAnimation { target: rippleRing; property: "opacity"; from: 1; to: 0; duration: 350; easing.type: Easing.InQuad }
+        NumberAnimation { target: stopRipple; property: "r"; from: 0; to: stopRipple.rMax; duration: 250; easing.type: Easing.OutQuad }
+        NumberAnimation { target: stopRipple; property: "opacity"; from: 1; to: 0; duration: 250; easing.type: Easing.InQuad }
     }
 
     // ---- rename input blocker (only while renaming a session) -------------
