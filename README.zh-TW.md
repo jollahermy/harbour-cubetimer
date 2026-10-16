@@ -30,12 +30,12 @@ aarch64 的 Sailfish OS 5.2 以上。在 Jolla Phone (2026) 上開發與測試�
 在有 Sailfish 用戶空間工具鏈（Qt 5.6、libsailfishapp）的裝置上：
 
 ```sh
-./build.sh                  # 編譯 bin/harbour-cubetimer（可用 SYSROOT=<路徑> 指定工具鏈）
-rpm/harbour-cubetimer.spec  # 把執行檔和 share/ 打包成 RPM
+./build.sh                  # 編譯 bin/harbour-hermy-cubetimer（可用 SYSROOT=<路徑> 指定工具鏈）
+rpm/harbour-hermy-cubetimer.spec  # 把執行檔和 share/ 打包成 RPM
 ```
 
 `build.sh` 預設在 `../sysroot` 找 Sailfish sysroot，除非另外設定 `SYSROOT`。
-`share/harbour-cubetimer/qml/` 底下的 QML 和 JavaScript 會在啟動時載入，所以只改介面不需要重新編譯。
+`share/harbour-hermy-cubetimer/qml/` 底下的 QML 和 JavaScript 會在啟動時載入，所以只改介面不需要重新編譯。
 
 ## 打亂
 
@@ -55,4 +55,4 @@ GPL-3.0，見 [LICENSE](LICENSE)。第三方程式碼：
 
 - csTimer 打亂產生器與 min2phase（GPL-3.0），Shuang Chen（cs0x7f）與貢獻者
 - ISAAC 亂數產生器，MIT 授權，Copyright (c) 2012 Yves-Marie K. Rinquin
-- Nunito 字型，SIL Open Font License 1.1（`share/harbour-cubetimer/qml/fonts/OFL.txt`）
+- Nunito 字型，SIL Open Font License 1.1（`share/harbour-hermy-cubetimer/qml/fonts/OFL.txt`）

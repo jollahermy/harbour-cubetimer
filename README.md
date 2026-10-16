@@ -32,12 +32,12 @@ Sailfish OS 5.2 or newer on aarch64. Developed and tested on the Jolla Phone (20
 On a device with the Sailfish user-space toolchain (Qt 5.6, libsailfishapp):
 
 ```sh
-./build.sh                  # compiles bin/harbour-cubetimer (SYSROOT=<path> overrides the toolchain)
-rpm/harbour-cubetimer.spec  # packages the binary and share/ into an RPM
+./build.sh                  # compiles bin/harbour-hermy-cubetimer (SYSROOT=<path> overrides the toolchain)
+rpm/harbour-hermy-cubetimer.spec  # packages the binary and share/ into an RPM
 ```
 
 `build.sh` looks for a Sailfish sysroot at `../sysroot` unless `SYSROOT` is set. The QML and
-JavaScript under `share/harbour-cubetimer/qml/` are loaded at start, so UI-only changes need no
+JavaScript under `share/harbour-hermy-cubetimer/qml/` are loaded at start, so UI-only changes need no
 rebuild.
 
 ## Scrambles
@@ -60,4 +60,4 @@ GPL-3.0, see [LICENSE](LICENSE). Third-party code:
 
 - csTimer scramble generators and min2phase (GPL-3.0), Shuang Chen (cs0x7f) and contributors
 - ISAAC PRNG, MIT License, Copyright (c) 2012 Yves-Marie K. Rinquin
-- Nunito font, SIL Open Font License 1.1 (`share/harbour-cubetimer/qml/fonts/OFL.txt`)
+- Nunito font, SIL Open Font License 1.1 (`share/harbour-hermy-cubetimer/qml/fonts/OFL.txt`)

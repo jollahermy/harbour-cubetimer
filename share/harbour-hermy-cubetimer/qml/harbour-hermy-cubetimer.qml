@@ -21,7 +21,7 @@ ApplicationWindow {
             sourceSize.width: width
             sourceSize.height: height
             fillMode: Image.PreserveAspectFit
-            source: Qt.resolvedUrl('../../icons/hicolor/256x256/apps/harbour-cubetimer.png')
+            source: Qt.resolvedUrl('../../icons/hicolor/256x256/apps/harbour-hermy-cubetimer.png')
         }
     }
 }

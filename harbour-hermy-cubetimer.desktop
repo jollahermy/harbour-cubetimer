@@ -2,11 +2,11 @@
 Type=Application
 Name=Cube Timer
 Comment=Rubik's cube speedsolving timer
-Icon=harbour-cubetimer
-Exec=harbour-cubetimer
+Icon=harbour-hermy-cubetimer
+Exec=harbour-hermy-cubetimer
 X-Nemo-Application-Type=silica-qt5
 
 [X-Sailjail]
 OrganizationName=org.jollahermy
-ApplicationName=harbour-cubetimer
+ApplicationName=harbour-hermy-cubetimer
 Permissions=

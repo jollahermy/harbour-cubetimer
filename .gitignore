@@ -1,5 +1,5 @@
 *.bak*
 *.o
-bin/harbour-cubetimer
-src/harbour-cubetimer
+bin/harbour-hermy-cubetimer
+src/harbour-hermy-cubetimer
 build/

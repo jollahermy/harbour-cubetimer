@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build bin/harbour-cubetimer on the phone with the user-space toolchain (no moc needed).
+# Build bin/harbour-hermy-cubetimer on the phone with the user-space toolchain (no moc needed).
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 S="${SYSROOT:-$HERE/../sysroot}"
@@ -16,6 +16,6 @@ for f in main.cpp nativescrambler.cpp $MODULES; do
   OBJ="$OBJ $o"
 done
 mkdir -p ../bin
-g++ --sysroot=$S -B$S/usr/bin/ -pthread -o ../bin/harbour-cubetimer $OBJ -L/usr/lib64 -lsailfishapp -lQt5Quick -lQt5Qml -lQt5Gui -lQt5Core -Wl,-rpath,/usr/lib64
-chown $(stat -c %u:%g main.cpp) ../bin/harbour-cubetimer
-ls -la ../bin/harbour-cubetimer
+g++ --sysroot=$S -B$S/usr/bin/ -pthread -o ../bin/harbour-hermy-cubetimer $OBJ -L/usr/lib64 -lsailfishapp -lQt5Quick -lQt5Qml -lQt5Gui -lQt5Core -Wl,-rpath,/usr/lib64
+chown $(stat -c %u:%g main.cpp) ../bin/harbour-hermy-cubetimer
+ls -la ../bin/harbour-hermy-cubetimer
