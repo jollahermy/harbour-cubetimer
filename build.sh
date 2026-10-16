@@ -1,8 +1,9 @@
 #!/bin/bash
 # Build bin/harbour-cubetimer on the phone with the user-space toolchain (no moc needed).
 set -e
-S=/home/defaultuser/devtools/sysroot
-cd "$(dirname "$0")/src"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+S="${SYSROOT:-$HERE/../sysroot}"
+cd "$HERE/src"
 export PATH=$S/usr/bin:$PATH LD_LIBRARY_PATH=$S/usr/lib64:/usr/lib64
 INC="-isystem $S/usr/include/sailfishapp -isystem $S/usr/include/qt5 -isystem $S/usr/include/qt5/QtCore -isystem $S/usr/include/qt5/QtGui -isystem $S/usr/include/qt5/QtQml -isystem $S/usr/include/qt5/QtQuick"   # -isystem: no warnings from Qt headers
 OBJ=""

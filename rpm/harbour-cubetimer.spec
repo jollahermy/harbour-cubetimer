@@ -9,7 +9,7 @@
 # validator's Symbols check and booster need. Build-time BRP scripts are disabled for the same
 # reason (the device has BusyBox xargs, which the BRP scripts cannot use).
 
-%{!?app_repo:%global app_repo /home/defaultuser/devtools/app}
+%{!?app_repo:%global app_repo %{_topdir}/../../app}
 %global debug_package %{nil}
 %global __os_install_post %{nil}
 

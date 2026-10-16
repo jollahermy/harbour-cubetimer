@@ -7,6 +7,6 @@ Exec=harbour-cubetimer
 X-Nemo-Application-Type=silica-qt5
 
 [X-Sailjail]
-OrganizationName=org.bfs87
+OrganizationName=org.jollahermy
 ApplicationName=harbour-cubetimer
 Permissions=
