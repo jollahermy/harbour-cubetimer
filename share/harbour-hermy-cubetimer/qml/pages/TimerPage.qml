@@ -395,6 +395,7 @@ Page {
     // (the most recent one, or a new "Session 1" if the event has none yet).
     function ensureSession() {
         var idx = -1;
+        var created = false;
         var rid = lastSessionByEvent[currentEvent.id];
         var ridIdx = -1;
         for (var k = 0; k < sessions.length; k++) {
@@ -410,9 +411,13 @@ Page {
                        created: Date.now(), solves: [] });
             sessions = all;
             idx = all.length - 1;
+            created = true;
         }
         currentSession = idx;
         rememberSession();
+        // The counter is already stored by nextSessionNumber(); store the session with it, or a quit
+        // before the first solve leaves the counter at N and no session, and the next start says N+1.
+        if (created) persist();
     }
     // Sessions of the current event, for the picker: [{index, name, count}].
     function listSessionsForEvent() {
