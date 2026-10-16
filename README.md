@@ -24,8 +24,13 @@ random-state scramble generated natively on the phone.
 
 ## Install
 
-Cube Timer is built for Sailfish OS (aarch64). The Harbour package is `harbour-cubetimer`; the
+Cube Timer is built for Sailfish OS on aarch64. The Harbour package is `harbour-cubetimer`; the
 RPM is validated with the Harbour RPM validator before each release (current version 1.8-1).
+
+**Compatibility:** tested only on the Jolla Phone (2026) running Sailfish OS 5.2.0.20. The binary is
+built against that release's glibc 2.41 and its RPM requires glibc 2.38 or newer, so it will not
+install on Sailfish OS 4.6 or 5.0 (both ship glibc 2.30). Other devices and screen sizes have not
+been tried.
 
 To build from source on the device you need the Sailfish user-space toolchain (Qt 5.6, libsailfishapp):
 

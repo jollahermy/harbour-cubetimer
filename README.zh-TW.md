@@ -23,8 +23,12 @@
 
 ## 安裝
 
-Cube Timer 是給 Sailfish OS（aarch64）用的。Harbour 套件名稱是 `harbour-cubetimer`，每次發佈前都會用
+Cube Timer 是給 aarch64 的 Sailfish OS 用的。Harbour 套件名稱是 `harbour-cubetimer`，每次發佈前都會用
 Harbour RPM validator 驗證（目前版本 1.8-1）。
+
+**相容性：** 只在 Jolla Phone (2026)、Sailfish OS 5.2.0.20 上測試過。執行檔是用該版本的 glibc 2.41 編譯的，
+RPM 要求 glibc 2.38 以上，所以無法安裝在 Sailfish OS 4.6 或 5.0（兩者都是 glibc 2.30）。
+其他裝置和螢幕尺寸都沒有試過。
 
 要在手機上從原始碼建置，需要 Sailfish 的用戶空間工具鏈（Qt 5.6、libsailfishapp）：
 
