@@ -2,9 +2,9 @@
 
 **English** | [繁體中文](README.zh-TW.md)
 
-A speedcubing timer for [Sailfish OS](https://sailfishos.org/), in the spirit of csTimer: hold to
-start, release to run, tap to stop. Solves are stored on the device, and every event gets a
-random-state scramble generated natively on the phone.
+A speedcubing timer for [Sailfish OS](https://sailfishos.org/): hold to start, release to run, tap
+to stop. Solves are stored on the device, and every event gets a random-state scramble generated
+natively on the phone.
 
 <p>
   <img src="docs/screenshots/timer.png" alt="Timer screen with scramble and live statistics" width="270">

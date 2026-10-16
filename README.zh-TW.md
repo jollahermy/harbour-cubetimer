@@ -2,8 +2,8 @@
 
 [English](README.md) | **繁體中文**
 
-給 [Sailfish OS](https://sailfishos.org/) 用的速擰計時器，仿照 csTimer 的操作：按住開始、放開計時、
-點一下停止。成績存在手機裡，每個項目都有在手機上原生產生的隨機狀態打亂。
+給 [Sailfish OS](https://sailfishos.org/) 用的速擰計時器：按住開始、放開計時、點一下停止。
+成績存在手機裡，每個項目都有在手機上原生產生的隨機狀態打亂。
 
 <p>
   <img src="docs/screenshots/timer.png" alt="計時畫面，含打亂和即時統計" width="270">
